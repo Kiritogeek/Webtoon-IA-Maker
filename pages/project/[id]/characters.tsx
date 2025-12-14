@@ -7,6 +7,7 @@ import AuthGuard from '@/components/AuthGuard'
 import ProjectSidebar from '@/components/project/ProjectSidebar'
 import ProjectTopbar from '@/components/project/ProjectTopbar'
 import { useProjectStore } from '@/lib/stores/projectStore'
+import { getProjectBackground } from '@/lib/backgroundPresets'
 
 type CharacterType = 'character' | 'monster' | 'enemy'
 

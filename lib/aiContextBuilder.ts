@@ -45,21 +45,41 @@ export function buildBaseContext(project: Project): string {
     contextParts.push(`Ambiance: ${project.ambiance}`)
   }
 
-  // Image de référence (template/identité visuelle) - RÈGLE ABSOLUE
-  // Cette image définit le style graphique de TOUS les éléments générés
-  // Priorité à identity_visual_reference_url, fallback sur style_reference_image_url pour compatibilité
-  const identityVisualReference = project.identity_visual_reference_url || project.style_reference_image_url
-  if (identityVisualReference) {
-    contextParts.push(`Référence visuelle ABSOLUE (Identité Visuelle): ${identityVisualReference}`)
-    contextParts.push('Cohérence visuelle OBLIGATOIRE: Tous les éléments générés doivent être PARFAITEMENT cohérents avec cette image de référence')
-    contextParts.push('Style, couleurs, traits, proportions, textures, ambiance - TOUT doit correspondre exactement à cette référence')
+  // Références visuelles (nouveau système multi-références) - RÈGLE ABSOLUE
+  // Toutes les images de référence définissent le style graphique de TOUS les éléments générés
+  // L'IA doit déduire le style commun à toutes ces références
+  // Fallback vers l'ancien système (identity_visual_reference_url) pour compatibilité
+  if (project.visual_references && project.visual_references.length > 0) {
+    const imageUrls = project.visual_references.map((ref: any) => ref.image_url).join(', ')
+    contextParts.push(`Références visuelles du projet (toutes également importantes): ${imageUrls}`)
+    contextParts.push('Objectif: Déduire le style graphique commun à ces références et l\'appliquer de manière cohérente à toutes les générations')
+    contextParts.push('Cohérence visuelle OBLIGATOIRE: Tous les éléments générés doivent respecter le style commun déduit de ces références')
+    contextParts.push('Style, couleurs, traits, proportions, textures, ambiance - TOUT doit être cohérent avec le style commun')
+  } else {
+    // Fallback vers l'ancien système (1 image unique)
+    const identityVisualReference = project.identity_visual_reference_url || project.style_reference_image_url
+    if (identityVisualReference) {
+      contextParts.push(`Référence visuelle ABSOLUE (Identité Visuelle): ${identityVisualReference}`)
+      contextParts.push('Cohérence visuelle OBLIGATOIRE: Tous les éléments générés doivent être PARFAITEMENT cohérents avec cette image de référence')
+      contextParts.push('Style, couleurs, traits, proportions, textures, ambiance - TOUT doit correspondre exactement à cette référence')
+    }
+  }
+
+  // Résumé de style si disponible (généré automatiquement par l'IA)
+  if (project.visual_style_summary) {
+    contextParts.push(`Style compris par l'IA: ${project.visual_style_summary}`)
+  }
+
+  // Prompt de style ajustable manuellement (optionnel)
+  if (project.visual_style_prompt) {
+    contextParts.push(`Ajustement manuel du style: ${project.visual_style_prompt}`)
   }
 
   // Format Webtoon vertical (OBLIGATOIRE)
   contextParts.push('Format: Webtoon vertical, 800px de largeur, scroll vertical')
   contextParts.push('Format de lecture: Panels successifs avec espaces de respiration')
 
-  // Style prompt personnalisé si défini
+  // Style prompt personnalisé si défini (ancien système, conservé pour compatibilité)
   if (project.style_prompt) {
     contextParts.push(`Style personnalisé: ${project.style_prompt}`)
   }

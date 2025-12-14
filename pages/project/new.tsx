@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { supabase, getUser } from '@/lib/supabase'
 import { GENRES, AMBIANCES, STYLES_GRAPHIQUES, type ProjectConfig } from '@/lib/projectConfig'
+import { getAllBackgroundPresets, getBackgroundPresetLabel, getProjectBackground, type BackgroundPreset } from '@/lib/backgroundPresets'
 
 // Fonction helper pour obtenir les templates d'images selon le style depuis Supabase Storage
 // Utilise le client Supabase pour obtenir les URLs publiques correctement
@@ -113,14 +114,13 @@ function NewProjectContent() {
     identity_visual_reference_url: '', // Template/Identité visuelle
     style_prompt: '',
     format: 'vertical',
-    nombre_personnages: undefined,
     univers_principal: '',
     background_type: undefined,
-    gradient_background: '',
-    background_image_url: '',
+    background_preset: undefined,
+    background_image_url: null,
   })
 
-  const totalSteps = 9
+  const totalSteps = 7
 
   // Charger les exemples quand un style est sélectionné
   useEffect(() => {
@@ -172,10 +172,9 @@ function NewProjectContent() {
       setError('Veuillez uploader une image de référence ou décrire votre style')
       return
     }
-    // Étape 5 : Nombre de personnages (optionnel, pas de validation nécessaire)
-    // Étape 6 : Univers principal (optionnel, pas de validation nécessaire)
-    // Étape 7 : Background (optionnel, pas de validation nécessaire)
-    // Étape 8 : Validation finale (soumet le formulaire)
+    // Étape 5 : Univers principal (optionnel, pas de validation nécessaire)
+    // Étape 6 : Background (optionnel, pas de validation nécessaire)
+    // Étape 7 : Validation finale (soumet le formulaire)
 
     setError(null)
     setIsGoingBack(false)
@@ -198,7 +197,7 @@ function NewProjectContent() {
         setJustAdvanced(false)
       }, 1100) // Après 1.1s (légèrement après la fin de l'animation de 1s)
     } else if (currentStep === totalSteps) {
-      // Étape 8 : Validation finale - soumettre
+      // Étape 7 : Validation finale - soumettre
       handleSubmit()
     }
   }
@@ -273,13 +272,15 @@ function NewProjectContent() {
     }
   }
 
-  // Fonction pour générer le dégradé avec les 3 couleurs
-  const getGradientBackground = () => {
-    const genreColor = config.genre ? (GENRES.find(g => g.value === config.genre)?.color || '#FFFFFF') : '#FFFFFF'
-    const ambianceColor = config.ambiance ? (AMBIANCES.find(a => a.value === config.ambiance)?.color || '#FFFFFF') : '#FFFFFF'
-    const styleColor = config.style_graphique ? (STYLES_GRAPHIQUES.find(s => s.value === config.style_graphique)?.color || '#FFFFFF') : '#FFFFFF'
-    
-    return `linear-gradient(to right, ${genreColor}, ${ambianceColor}, ${styleColor})`
+  // Obtenir le background du projet (ambiance sélectionnée)
+  const getProjectBackgroundStyle = () => {
+    // Créer un objet projet temporaire avec les valeurs de config pour utiliser getProjectBackground
+    const tempProject = {
+      background_type: config.background_type,
+      background_preset: config.background_preset,
+      background_image_url: config.background_image_url,
+    }
+    return getProjectBackground(tempProject)
   }
 
   const handleSubmit = async () => {
@@ -304,40 +305,74 @@ function NewProjectContent() {
           return
         }
 
-        // Utiliser le background choisi ou générer un par défaut
-        const gradientBackground = config.gradient_background || 
-          (config.background_type === 'black' ? 'linear-gradient(to right, #000000, #1a1a1a, #000000)' :
-           config.background_type === 'gray' ? 'linear-gradient(to right, #2a2a2a, #3a3a3a, #2a2a2a)' :
-           config.background_type === 'white' ? 'linear-gradient(to right, #ffffff, #f5f5f5, #ffffff)' :
-           config.background_type === 'custom' && config.background_image_url ? `url(${config.background_image_url})` :
-           getGradientBackground()) // Par défaut, utiliser l'ancien système
+        // Utiliser la nouvelle structure normalisée
+        // Le gradient_background sera calculé côté front via getProjectBackground()
+        // On stocke uniquement les données métier
 
-        // Créer le projet avec toutes les configurations
-        const { data, error: projectError } = await supabase
+        // Préparer les données de base du projet
+        // S'assurer que toutes les valeurs sont soit définies soit null (pas undefined)
+        const baseProjectData: any = {
+          name: config.name,
+          description: config.description || null,
+          user_id: user.id,
+          genre: config.genre || null,
+          genre_custom: config.genre === 'custom' ? (config.genre_custom || null) : null,
+          ambiance: config.ambiance || null,
+          ambiance_custom: config.ambiance === 'custom' ? (config.ambiance_custom || null) : null,
+          style_graphique: config.style_graphique || null,
+          style_reference_image_url: config.style_reference_image_url || null, // Conservé pour compatibilité
+          identity_visual_reference_url: config.identity_visual_reference_url || null, // Template/Identité visuelle
+          style_prompt: config.style_prompt || null,
+          format: config.format || 'vertical',
+          univers_principal: config.univers_principal || null,
+        }
+
+        // Ajouter les champs de background
+        const projectDataWithBackground = {
+          ...baseProjectData,
+          background_type: config.background_type || 'preset',
+          background_preset: config.background_preset || null,
+          background_image_url: config.background_image_url || null,
+        }
+
+        // Essayer d'abord avec les colonnes de background
+        let { data, error: projectError } = await supabase
           .from('projects')
-          .insert([
-            {
-              name: config.name,
-              description: config.description || null,
-              user_id: user.id,
-              genre: config.genre,
-              genre_custom: config.genre === 'custom' ? config.genre_custom : null,
-              ambiance: config.ambiance,
-              ambiance_custom: config.ambiance === 'custom' ? config.ambiance_custom : null,
-              style_graphique: config.style_graphique,
-              style_reference_image_url: config.style_reference_image_url || null, // Conservé pour compatibilité
-              identity_visual_reference_url: config.identity_visual_reference_url || null, // Template/Identité visuelle
-              style_prompt: config.style_prompt || null,
-              format: config.format || 'vertical',
-              nombre_personnages: config.nombre_personnages ?? null,
-              univers_principal: config.univers_principal || null,
-              gradient_background: gradientBackground, // Stocker le background choisi
-            },
-          ])
+          .insert([projectDataWithBackground])
           .select()
           .single()
 
-        if (projectError) throw projectError
+        // Si erreur liée à des colonnes manquantes, réessayer sans les colonnes de background
+        if (projectError) {
+          const errorMessage = projectError.message || JSON.stringify(projectError)
+          const isColumnError = errorMessage.includes('column') || 
+                               errorMessage.includes('does not exist') ||
+                               errorMessage.includes('PGRST') ||
+                               projectError.code === 'PGRST116' ||
+                               projectError.code === '42P01'
+          
+          if (isColumnError) {
+            console.warn('Colonnes de background non trouvées, création sans ces colonnes. Exécutez la migration SQL.')
+            // Réessayer sans les colonnes de background
+            const { data: retryData, error: retryError } = await supabase
+              .from('projects')
+              .insert([baseProjectData])
+              .select()
+              .single()
+            
+            if (retryError) {
+              console.error('Erreur lors de la création du projet (sans background):', retryError)
+              throw new Error(retryError.message || 'Erreur lors de la création du projet')
+            }
+            
+            data = retryData
+            projectError = null
+          } else {
+            console.error('Erreur lors de la création du projet:', projectError)
+            console.error('Données envoyées:', projectDataWithBackground)
+            throw new Error(errorMessage)
+          }
+        }
 
         // Afficher le popup de succès
         setShowSuccess(true)
@@ -433,13 +468,16 @@ function NewProjectContent() {
 
   const progressColors = getProgressColors()
 
-  const gradientBackground = getGradientBackground()
+  const projectBackground = getProjectBackgroundStyle()
 
   return (
     <div 
       className={`min-h-screen p-4 sm:p-6 lg:p-8 relative overflow-hidden transition-all duration-500 ${!isSubmitting ? 'bg-darker' : ''} ${gradientVisible ? 'gradient-fade-in' : ''}`}
       style={{
-        background: gradientVisible ? gradientBackground : (isSubmitting ? gradientBackground : undefined),
+        background: gradientVisible ? projectBackground : (isSubmitting ? projectBackground : undefined),
+        backgroundSize: gradientVisible || isSubmitting ? 'cover' : undefined,
+        backgroundPosition: gradientVisible || isSubmitting ? 'center' : undefined,
+        backgroundRepeat: gradientVisible || isSubmitting ? 'no-repeat' : undefined,
         opacity: gradientVisible ? 1 : (isSubmitting ? 0 : 1),
       }}
     >
@@ -902,62 +940,8 @@ function NewProjectContent() {
             </div>
           )}
 
-          {/* Étape 5 : Nombre initial de personnages */}
+          {/* Étape 5 : Univers principal */}
           {currentStep === 5 && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  Nombre initial de personnages
-                </h2>
-                <p className="text-white/70 mb-4 text-sm">
-                  Indiquez combien de personnages principaux vous souhaitez créer pour votre webtoon.
-                </p>
-              </div>
-              <div className="space-y-4">
-                <div className="grid grid-cols-5 sm:grid-cols-6 gap-3 mb-6">
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => {
-                    const isSelected = config.nombre_personnages === num
-                    return (
-                      <button
-                        key={num}
-                        onClick={() => setConfig({ ...config, nombre_personnages: num })}
-                        className="p-4 rounded-xl border-2 transition bg-darker/90 backdrop-blur-sm shadow-lg text-white font-bold"
-                        style={{
-                          borderColor: isSelected ? '#FEE600' : 'rgba(255, 255, 255, 0.5)',
-                          backgroundColor: isSelected ? '#FEE60020' : 'rgba(26, 26, 26, 0.9)'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isSelected) {
-                            e.currentTarget.style.borderColor = '#FEE600'
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isSelected) {
-                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)'
-                          }
-                        }}
-                      >
-                        {num}
-                      </button>
-                    )
-                  })}
-                </div>
-                <button
-                  onClick={() => setConfig({ ...config, nombre_personnages: null })}
-                  className={`w-full p-4 rounded-xl border-2 transition bg-darker/90 backdrop-blur-sm shadow-lg text-white ${
-                    config.nombre_personnages === null
-                      ? 'border-accent bg-accent/20'
-                      : 'border-white/50 hover:border-accent'
-                  }`}
-                >
-                  Je ne sais pas encore
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Étape 6 : Univers principal */}
-          {currentStep === 6 && (
             <div className="space-y-6">
               <div className="text-center">
                 <h2 className="text-2xl font-bold text-white mb-2">
@@ -985,68 +969,70 @@ function NewProjectContent() {
             </div>
           )}
 
-          {/* Étape 7 : Choix du background */}
-          {currentStep === 7 && (
+          {/* Étape 6 : Choix du background */}
+          {currentStep === 6 && (
             <div className="space-y-6">
               <div className="text-center">
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  Choix du background
+                  Ambiance visuelle
                 </h2>
                 <p className="text-white/70 mb-4 text-sm">
-                  Choisissez le fond de votre projet. Vous pourrez le modifier dans les paramètres.
+                  Choisissez l'ambiance visuelle de votre projet. Vous pourrez la modifier dans les paramètres.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                {/* Fond noir */}
-                <button
-                  onClick={() => setConfig({ ...config, background_type: 'black', gradient_background: 'linear-gradient(to right, #000000, #1a1a1a, #000000)' })}
-                  className={`p-6 rounded-xl border-2 transition ${
-                    config.background_type === 'black'
-                      ? 'border-yellow bg-yellow/20'
-                      : 'border-white/50 hover:border-white/80 bg-darkest/50'
-                  }`}
-                >
-                  <div className="h-24 rounded-lg mb-3 bg-gradient-to-r from-black via-gray-900 to-black"></div>
-                  <p className="text-white font-semibold">Fond noir</p>
-                </button>
-
-                {/* Fond gris */}
-                <button
-                  onClick={() => setConfig({ ...config, background_type: 'gray', gradient_background: 'linear-gradient(to right, #2a2a2a, #3a3a3a, #2a2a2a)' })}
-                  className={`p-6 rounded-xl border-2 transition ${
-                    config.background_type === 'gray'
-                      ? 'border-yellow bg-yellow/20'
-                      : 'border-white/50 hover:border-white/80 bg-darkest/50'
-                  }`}
-                >
-                  <div className="h-24 rounded-lg mb-3 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800"></div>
-                  <p className="text-white font-semibold">Fond gris</p>
-                </button>
-
-                {/* Fond blanc */}
-                <button
-                  onClick={() => setConfig({ ...config, background_type: 'white', gradient_background: 'linear-gradient(to right, #ffffff, #f5f5f5, #ffffff)' })}
-                  className={`p-6 rounded-xl border-2 transition ${
-                    config.background_type === 'white'
-                      ? 'border-yellow bg-yellow/20'
-                      : 'border-white/50 hover:border-white/80 bg-darkest/50'
-                  }`}
-                >
-                  <div className="h-24 rounded-lg mb-3 bg-gradient-to-r from-white via-gray-100 to-white"></div>
-                  <p className="text-white font-semibold">Fond blanc</p>
-                </button>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {getAllBackgroundPresets().map((preset) => (
+                  <button
+                    key={preset.value}
+                    onClick={() => setConfig({ 
+                      ...config, 
+                      background_type: 'preset',
+                      background_preset: preset.value,
+                      background_image_url: null, // Réinitialiser l'image si on choisit un preset
+                    })}
+                    className={`p-6 rounded-xl border-2 transition ${
+                      config.background_type === 'preset' && config.background_preset === preset.value
+                        ? 'border-yellow bg-yellow/20'
+                        : 'border-white/50 hover:border-white/80 bg-darkest/50'
+                    }`}
+                  >
+                    <div className={`h-24 rounded-lg mb-3 bg-gradient-to-r ${preset.previewColor}`}></div>
+                    <p className="text-white font-semibold text-sm">{preset.label}</p>
+                  </button>
+                ))}
 
                 {/* Personnalisé */}
                 <button
-                  onClick={() => setConfig({ ...config, background_type: 'custom' })}
+                  onClick={() => setConfig({ 
+                    ...config, 
+                    background_type: 'custom',
+                    background_preset: null, // Réinitialiser le preset si on choisit custom
+                  })}
                   className={`p-6 rounded-xl border-2 transition ${
                     config.background_type === 'custom'
                       ? 'border-yellow bg-yellow/20'
                       : 'border-white/50 hover:border-white/80 bg-darkest/50'
                   }`}
                 >
-                  <div className="h-24 rounded-lg mb-3 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600"></div>
-                  <p className="text-white font-semibold">Personnalisé</p>
+                  <div className="h-24 rounded-lg mb-3 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 flex items-center justify-center relative overflow-hidden">
+                    {!config.background_image_url ? (
+                      <>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-white/60">
+                          <svg className="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span className="text-xs font-medium">Image</span>
+                        </div>
+                      </>
+                    ) : (
+                      <img
+                        src={config.background_image_url}
+                        alt="Background personnalisé"
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <p className="text-white font-semibold text-sm">Image personnalisée</p>
                 </button>
               </div>
 
@@ -1090,7 +1076,7 @@ function NewProjectContent() {
                           .from('images')
                           .getPublicUrl(fileName)
                         
-                        setConfig({ ...config, background_image_url: publicUrl, gradient_background: `url(${publicUrl})` })
+                        setConfig({ ...config, background_image_url: publicUrl })
                       } catch (err: any) {
                         setError(err.message || 'Erreur lors de l\'upload de l\'image')
                       } finally {
@@ -1120,85 +1106,8 @@ function NewProjectContent() {
             </div>
           )}
 
-          {/* Étape 8 : Rappel de tous les éléments */}
-          {currentStep === 8 && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  Récapitulatif de votre projet
-                </h2>
-                <p className="text-white/70 mb-6 text-sm">
-                  Vérifiez tous les éléments de votre projet avant de le créer.
-                </p>
-              </div>
-              <div className="bg-darkest/50 rounded-xl p-6 space-y-4 border-2 border-white/20 max-h-96 overflow-y-auto">
-                <div className="flex justify-between items-start">
-                  <span className="text-white/70 font-semibold">Nom :</span>
-                  <span className="text-white text-right">{config.name}</span>
-                </div>
-                {config.description && (
-                  <div className="flex justify-between items-start">
-                    <span className="text-white/70 font-semibold">Description :</span>
-                    <span className="text-white text-right text-sm">{config.description}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-start">
-                  <span className="text-white/70 font-semibold">Genre :</span>
-                  <span className="text-white text-right">
-                    {config.genre === 'custom' 
-                      ? config.genre_custom 
-                      : GENRES.find(g => g.value === config.genre)?.label}
-                  </span>
-                </div>
-                <div className="flex justify-between items-start">
-                  <span className="text-white/70 font-semibold">Ambiance :</span>
-                  <span className="text-white text-right">
-                    {config.ambiance === 'custom'
-                      ? config.ambiance_custom
-                      : AMBIANCES.find(a => a.value === config.ambiance)?.label}
-                  </span>
-                </div>
-                <div className="flex justify-between items-start">
-                  <span className="text-white/70 font-semibold">Style visuel :</span>
-                  <span className="text-white text-right">
-                    {STYLES_GRAPHIQUES.find(s => s.value === config.style_graphique)?.label}
-                  </span>
-                </div>
-                <div className="flex justify-between items-start">
-                  <span className="text-white/70 font-semibold">Format :</span>
-                  <span className="text-white text-right capitalize">
-                    {config.format === 'vertical' ? 'Vertical' : 'Horizontal'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-start">
-                  <span className="text-white/70 font-semibold">Nombre de personnages :</span>
-                  <span className="text-white text-right">
-                    {config.nombre_personnages === null 
-                      ? 'Je ne sais pas encore'
-                      : config.nombre_personnages}
-                  </span>
-                </div>
-                {config.univers_principal && (
-                  <div className="flex justify-between items-start">
-                    <span className="text-white/70 font-semibold">Univers principal :</span>
-                    <span className="text-white text-right text-sm">{config.univers_principal}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-start">
-                  <span className="text-white/70 font-semibold">Background :</span>
-                  <span className="text-white text-right">
-                    {config.background_type === 'black' ? 'Fond noir' :
-                     config.background_type === 'gray' ? 'Fond gris' :
-                     config.background_type === 'white' ? 'Fond blanc' :
-                     config.background_type === 'custom' ? 'Personnalisé' : 'Par défaut'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Étape 9 : Validation finale */}
-          {currentStep === 9 && (
+          {/* Étape 7 : Validation finale */}
+          {currentStep === 7 && (
             <div className={`space-y-6 ${isSubmitting ? 'fade-out' : ''}`}>
               <div className="text-center">
                 <h2 className="text-2xl font-bold text-white mb-2">
@@ -1247,14 +1156,6 @@ function NewProjectContent() {
                     {config.format === 'vertical' ? 'Vertical' : 'Horizontal'}
                   </span>
                 </div>
-                <div className="flex justify-between items-start">
-                  <span className="text-white/70 font-semibold">Nombre de personnages :</span>
-                  <span className="text-white text-right">
-                    {config.nombre_personnages === null 
-                      ? 'Je ne sais pas encore'
-                      : config.nombre_personnages}
-                  </span>
-                </div>
                 {config.univers_principal && (
                   <div className="flex justify-between items-start">
                     <span className="text-white/70 font-semibold">Univers principal :</span>
@@ -1264,10 +1165,11 @@ function NewProjectContent() {
                 <div className="flex justify-between items-start">
                   <span className="text-white/70 font-semibold">Background :</span>
                   <span className="text-white text-right">
-                    {config.background_type === 'black' ? 'Fond noir' :
-                     config.background_type === 'gray' ? 'Fond gris' :
-                     config.background_type === 'white' ? 'Fond blanc' :
-                     config.background_type === 'custom' ? 'Personnalisé' : 'Par défaut'}
+                    {config.background_type === 'preset' && config.background_preset 
+                      ? getBackgroundPresetLabel(config.background_preset)
+                      : config.background_type === 'custom' 
+                        ? 'Image personnalisée' 
+                        : 'Par défaut'}
                   </span>
                 </div>
               </div>

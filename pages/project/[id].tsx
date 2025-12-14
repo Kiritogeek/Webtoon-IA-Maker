@@ -9,6 +9,7 @@ import ProjectHeader from '@/components/project/ProjectHeader'
 import ProjectDashboard from '@/components/project/ProjectDashboard'
 import ProjectCard from '@/components/project/ProjectCard'
 import { useProjectStore } from '@/lib/stores/projectStore'
+import { getProjectBackground } from '@/lib/backgroundPresets'
 
 function ProjectPageContent() {
   const router = useRouter()
@@ -71,7 +72,7 @@ function ProjectPageContent() {
     <div
       className="min-h-screen"
       style={{
-        background: project.gradient_background || 'linear-gradient(to right, #050510, #0A0A0F, #050510)',
+        background: getProjectBackground(project),
         backgroundAttachment: 'fixed',
         backgroundSize: 'cover',
       }}

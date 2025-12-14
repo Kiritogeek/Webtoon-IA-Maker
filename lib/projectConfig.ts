@@ -87,8 +87,11 @@ export interface ProjectConfig {
   format?: 'vertical' | 'horizontal'
   nombre_personnages?: number | null // null = "Je ne sais pas encore"
   univers_principal?: string
-  background_type?: 'black' | 'gray' | 'white' | 'custom'
-  gradient_background?: string // Gradient CSS ou URL d'image pour le background
-  background_image_url?: string // URL de l'image pour le background personnalisé
+  // Nouvelle structure normalisée
+  background_type?: 'preset' | 'custom'
+  background_preset?: 'indigo-violet' | 'rose-violet' | 'dark-creative' | 'colorful-gradient' | 'dark-indigo' | null
+  background_image_url?: string | null
+  // Ancien champ (déprécié, conservé pour compatibilité)
+  gradient_background?: string
 }
 

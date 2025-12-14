@@ -7,6 +7,7 @@ import ProjectSidebar from '@/components/project/ProjectSidebar'
 import ProjectTopbar from '@/components/project/ProjectTopbar'
 import { useProjectStore } from '@/lib/stores/projectStore'
 import SettingsIcon from '@/components/icons/SettingsIcon'
+import { getAllBackgroundPresets, getBackgroundPresetLabel, getProjectBackground, type BackgroundPreset } from '@/lib/backgroundPresets'
 
 function ParametresPageContent() {
   const router = useRouter()
@@ -17,7 +18,8 @@ function ParametresPageContent() {
   
   // États pour les formulaires
   const [showBackgroundModal, setShowBackgroundModal] = useState(false)
-  const [backgroundType, setBackgroundType] = useState<'black' | 'gray' | 'white' | 'custom'>('black')
+  const [backgroundType, setBackgroundType] = useState<'preset' | 'custom'>('preset')
+  const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset | null>(null)
   const [customBackgroundImage, setCustomBackgroundImage] = useState<File | null>(null)
   const [customBackgroundPreview, setCustomBackgroundPreview] = useState<string | null>(null)
   const [projectLanguage, setProjectLanguage] = useState('fr')
@@ -35,19 +37,11 @@ function ParametresPageContent() {
 
   useEffect(() => {
     if (project) {
-      // Déterminer le type de background
-      const bg = project.gradient_background || ''
-      if (bg.startsWith('url(')) {
-        setBackgroundType('custom')
-        setCustomBackgroundPreview(bg.replace('url(', '').replace(')', ''))
-      } else if (bg.includes('#000000') || bg.includes('black')) {
-        setBackgroundType('black')
-      } else if (bg.includes('#2a2a2a') || bg.includes('gray')) {
-        setBackgroundType('gray')
-      } else if (bg.includes('#ffffff') || bg.includes('white')) {
-        setBackgroundType('white')
-      } else {
-        setBackgroundType('black') // Par défaut
+      // Lire directement les champs normalisés - ZÉRO détection
+      setBackgroundType(project.background_type || 'preset')
+      setBackgroundPreset(project.background_preset || null)
+      if (project.background_image_url) {
+        setCustomBackgroundPreview(project.background_image_url)
       }
     }
   }, [project])
@@ -69,24 +63,19 @@ function ParametresPageContent() {
     reader.readAsDataURL(file)
   }
 
-  const handleBackgroundChange = async (type: 'black' | 'gray' | 'white' | 'custom') => {
+  const handleBackgroundChange = async (type: 'preset' | 'custom', preset?: BackgroundPreset) => {
     if (type === 'custom' && !customBackgroundImage && !customBackgroundPreview) {
       // Si on choisit personnalisé sans image, ouvrir le sélecteur de fichier
       document.getElementById('background-image-upload')?.click()
       setBackgroundType('custom')
+      setBackgroundPreset(null)
       return
     }
 
     setSaving(true)
-    let gradient = ''
+    let backgroundImageUrl: string | null = null
     
-    if (type === 'black') {
-      gradient = 'linear-gradient(to right, #000000, #1a1a1a, #000000)'
-    } else if (type === 'gray') {
-      gradient = 'linear-gradient(to right, #2a2a2a, #3a3a3a, #2a2a2a)'
-    } else if (type === 'white') {
-      gradient = 'linear-gradient(to right, #ffffff, #f5f5f5, #ffffff)'
-    } else if (type === 'custom' && customBackgroundImage) {
+    if (type === 'custom' && customBackgroundImage) {
       // Uploader l'image
       setUploading(true)
       try {
@@ -109,7 +98,7 @@ function ParametresPageContent() {
           .from('images')
           .getPublicUrl(fileName)
 
-        gradient = `url(${publicUrl})`
+        backgroundImageUrl = publicUrl
       } catch (error) {
         console.error('Error uploading background image:', error)
         alert('Erreur lors de l\'upload de l\'image')
@@ -120,7 +109,10 @@ function ParametresPageContent() {
         setUploading(false)
       }
     } else if (type === 'custom' && customBackgroundPreview) {
-      gradient = `url(${customBackgroundPreview})`
+      backgroundImageUrl = customBackgroundPreview
+    } else if (type === 'preset' && preset) {
+      // Preset sélectionné - pas besoin d'upload
+      backgroundImageUrl = null
     } else {
       setSaving(false)
       return
@@ -128,10 +120,20 @@ function ParametresPageContent() {
 
     if (project && id && typeof id === 'string') {
       try {
-        // Mettre à jour dans Supabase
+        // Mettre à jour dans Supabase avec la nouvelle structure normalisée
+        const updateData: {
+          background_type: 'preset' | 'custom'
+          background_preset?: BackgroundPreset | null
+          background_image_url?: string | null
+        } = {
+          background_type: type,
+          background_preset: type === 'preset' ? preset || null : null,
+          background_image_url: type === 'custom' ? backgroundImageUrl : null,
+        }
+
         const { data, error } = await supabase
           .from('projects')
-          .update({ gradient_background: gradient })
+          .update(updateData)
           .eq('id', id)
           .select()
           .single()
@@ -139,8 +141,9 @@ function ParametresPageContent() {
         if (error) throw error
         
         // Mettre à jour le store
-        updateProject({ gradient_background: gradient })
+        updateProject(updateData)
         setBackgroundType(type)
+        setBackgroundPreset(type === 'preset' ? preset || null : null)
         setShowBackgroundModal(false)
       } catch (error) {
         console.error('Error updating background:', error)
@@ -171,7 +174,7 @@ function ParametresPageContent() {
     <div
       className="min-h-screen"
       style={{
-        background: project.gradient_background || 'linear-gradient(to right, #050510, #0A0A0F, #050510)',
+        background: getProjectBackground(project),
         backgroundAttachment: 'fixed',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -208,9 +211,9 @@ function ParametresPageContent() {
             <p className="text-white/70">Gérez les paramètres de votre projet</p>
           </div>
 
-          {/* 1. Background du projet */}
+          {/* 1. Ambiance visuelle */}
           <div className="bg-darker/90 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/10">
-            <h2 className="text-xl font-bold text-white mb-4">🎨 Background du projet</h2>
+            <h2 className="text-xl font-bold text-white mb-4">🎨 Ambiance visuelle</h2>
             <div
               onClick={() => setShowBackgroundModal(true)}
               className="cursor-pointer group"
@@ -218,14 +221,14 @@ function ParametresPageContent() {
               <div 
                 className="h-32 rounded-xl overflow-hidden border-2 border-white/20 group-hover:border-white/40 transition"
                 style={{
-                  background: project.gradient_background || 'linear-gradient(to right, #000000, #1a1a1a, #000000)',
+                  background: getProjectBackground(project),
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                 }}
               >
-                {project.gradient_background?.startsWith('url(') && (
+                {project.background_type === 'custom' && project.background_image_url && (
                   <img
-                    src={project.gradient_background.replace('url(', '').replace(')', '')}
+                    src={project.background_image_url}
                     alt="Background"
                     className="w-full h-full object-cover"
                   />
@@ -251,45 +254,22 @@ function ParametresPageContent() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <button
-                    onClick={() => handleBackgroundChange('black')}
-                    disabled={saving || uploading}
-                    className={`p-4 rounded-xl border-2 transition ${
-                      backgroundType === 'black'
-                        ? 'border-yellow bg-yellow/20'
-                        : 'border-white/50 hover:border-white/80 bg-darkest/50'
-                    } ${saving || uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className="h-16 rounded-lg mb-2 bg-gradient-to-r from-black via-gray-900 to-black"></div>
-                    <p className="text-white font-semibold text-sm">Fond noir</p>
-                  </button>
-
-                  <button
-                    onClick={() => handleBackgroundChange('gray')}
-                    disabled={saving || uploading}
-                    className={`p-4 rounded-xl border-2 transition ${
-                      backgroundType === 'gray'
-                        ? 'border-yellow bg-yellow/20'
-                        : 'border-white/50 hover:border-white/80 bg-darkest/50'
-                    } ${saving || uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className="h-16 rounded-lg mb-2 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800"></div>
-                    <p className="text-white font-semibold text-sm">Fond gris</p>
-                  </button>
-
-                  <button
-                    onClick={() => handleBackgroundChange('white')}
-                    disabled={saving || uploading}
-                    className={`p-4 rounded-xl border-2 transition ${
-                      backgroundType === 'white'
-                        ? 'border-yellow bg-yellow/20'
-                        : 'border-white/50 hover:border-white/80 bg-darkest/50'
-                    } ${saving || uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className="h-16 rounded-lg mb-2 bg-gradient-to-r from-white via-gray-100 to-white"></div>
-                    <p className="text-white font-semibold text-sm">Fond blanc</p>
-                  </button>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                  {getAllBackgroundPresets().map((preset) => (
+                    <button
+                      key={preset.value}
+                      onClick={() => handleBackgroundChange('preset', preset.value)}
+                      disabled={saving || uploading}
+                      className={`p-4 rounded-xl border-2 transition ${
+                        backgroundType === 'preset' && backgroundPreset === preset.value
+                          ? 'border-yellow bg-yellow/20'
+                          : 'border-white/50 hover:border-white/80 bg-darkest/50'
+                      } ${saving || uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <div className={`h-16 rounded-lg mb-2 bg-gradient-to-r ${preset.previewColor}`}></div>
+                      <p className="text-white font-semibold text-sm">{preset.label}</p>
+                    </button>
+                  ))}
 
                   <button
                     onClick={() => handleBackgroundChange('custom')}
@@ -300,8 +280,23 @@ function ParametresPageContent() {
                         : 'border-white/50 hover:border-white/80 bg-darkest/50'
                     } ${saving || uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <div className="h-16 rounded-lg mb-2 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600"></div>
-                    <p className="text-white font-semibold text-sm">Personnalisé</p>
+                    <div className="h-16 rounded-lg mb-2 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 flex items-center justify-center relative overflow-hidden">
+                      {!customBackgroundPreview ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-white/60">
+                          <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span className="text-xs font-medium">Image</span>
+                        </div>
+                      ) : (
+                        <img
+                          src={customBackgroundPreview}
+                          alt="Background personnalisé"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                    <p className="text-white font-semibold text-sm">Image personnalisée</p>
                   </button>
                 </div>
 

@@ -16,9 +16,28 @@ export interface Project {
   identity_visual_reference_url?: string | null // Template/Identité visuelle (utilisé par l'IA pour la cohérence graphique)
   style_prompt?: string | null
   format?: string | null
-  gradient_background?: string | null // Dégradé de couleurs pour le background
+  // Nouvelle structure normalisée pour le background
+  background_type?: 'preset' | 'custom' | null
+  background_preset?: 'indigo-violet' | 'rose-violet' | 'dark-creative' | 'colorful-gradient' | 'dark-indigo' | null
+  background_image_url?: string | null
+  // Ancien champ (déprécié, conservé pour compatibilité)
+  gradient_background?: string | null
   nombre_personnages?: number | null
   univers_principal?: string | null
+  // Nouveau système d'identité visuelle (moodboard)
+  visual_style_summary?: string | null // Résumé textuel généré automatiquement par l'IA
+  visual_style_prompt?: string | null // Prompt de style ajustable manuellement (optionnel)
+  // Références visuelles (chargées séparément, pas dans la table projects)
+  visual_references?: ProjectVisualReference[] // Chargées via relation
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectVisualReference {
+  id: string
+  project_id: string
+  image_url: string
+  display_order: number
   created_at: string
   updated_at: string
 }

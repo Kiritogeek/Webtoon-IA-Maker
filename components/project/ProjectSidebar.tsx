@@ -40,7 +40,7 @@ export default function ProjectSidebar({ projectId, activeSection, isCollapsed =
     { id: 'characters', label: 'Personnages', icon: 'characters', path: `/project/${projectId}/characters` },
     { id: 'places', label: 'Lieux / Décors', icon: 'places', path: `/project/${projectId}/places` },
     { id: 'scenario', label: 'Scénario', icon: 'scenario', path: `/project/${projectId}/scenario` },
-    { id: 'identity', label: 'Identité Visuelle', icon: 'identity', path: `/project/${projectId}#identity` },
+    { id: 'identity', label: 'Identité Visuelle', icon: 'identity', path: `/project/${projectId}/identite-visuelle` },
     { id: 'assets', label: 'Assets', icon: 'assets', path: `/project/${projectId}#assets` },
     { id: 'settings', label: 'Paramètres', icon: 'settings', path: `/project/${projectId}/parametres` },
   ]

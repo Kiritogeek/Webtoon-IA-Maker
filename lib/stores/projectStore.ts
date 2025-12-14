@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import type { Project, Character, Chapter, Scene, Place, Scenario, ChapterNotes } from '@/lib/supabase'
+import type { Project, Character, Chapter, Scene, Place, Scenario, ChapterNotes, ProjectVisualReference } from '@/lib/supabase'
 
 interface ProjectState {
   project: Project | null
@@ -95,17 +95,28 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projectResult,
         charactersResult,
         chaptersResult,
-        placesResult
+        placesResult,
+        visualReferencesResult
       ] = await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase.from('characters').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
         supabase.from('chapters').select('*').eq('project_id', projectId).order('order', { ascending: true }),
-        supabase.from('places').select('*').eq('project_id', projectId).order('created_at', { ascending: false })
+        supabase.from('places').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+        supabase.from('project_visual_references').select('*').eq('project_id', projectId).order('display_order', { ascending: true })
       ])
       
       // Mettre à jour le store avec les données essentielles
       if (projectResult.error) throw projectResult.error
-      set({ project: projectResult.data })
+      const projectData = projectResult.data
+      
+      // Attacher les références visuelles au projet
+      if (!visualReferencesResult.error && visualReferencesResult.data) {
+        projectData.visual_references = visualReferencesResult.data || []
+      } else {
+        projectData.visual_references = []
+      }
+      
+      set({ project: projectData })
       
       if (!charactersResult.error) {
         set({ characters: charactersResult.data || [] })

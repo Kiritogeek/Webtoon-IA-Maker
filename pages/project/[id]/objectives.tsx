@@ -8,6 +8,7 @@ import ProjectTopbar from '@/components/project/ProjectTopbar'
 import ProjectObjectives from '@/components/project/ProjectObjectives'
 import { useProjectStore } from '@/lib/stores/projectStore'
 import ObjectivesIcon from '@/components/icons/ObjectivesIcon'
+import { getProjectBackground } from '@/lib/backgroundPresets'
 
 function ObjectivesPageContent() {
   const router = useRouter()
@@ -49,7 +50,7 @@ function ObjectivesPageContent() {
     <div
       className="min-h-screen"
       style={{
-        background: project.gradient_background || 'linear-gradient(to right, #050510, #0A0A0F, #050510)',
+        background: getProjectBackground(project),
         backgroundAttachment: 'fixed',
         backgroundSize: 'cover',
       }}

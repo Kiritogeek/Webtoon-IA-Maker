@@ -7,6 +7,7 @@ import AuthGuard from '@/components/AuthGuard'
 import ProjectSidebar from '@/components/project/ProjectSidebar'
 import ProjectTopbar from '@/components/project/ProjectTopbar'
 import { useProjectStore } from '@/lib/stores/projectStore'
+import { getProjectBackground } from '@/lib/backgroundPresets'
 
 function ChaptersPageContent() {
   const router = useRouter()
@@ -126,7 +127,14 @@ function ChaptersPageContent() {
   }
 
   return (
-    <div className="min-h-screen creative-bg relative">
+    <div 
+      className="min-h-screen relative"
+      style={{
+        background: getProjectBackground(project),
+        backgroundAttachment: 'fixed',
+        backgroundSize: 'cover',
+      }}
+    >
       <ProjectSidebar
         projectId={id as string}
         activeSection="chapters"
