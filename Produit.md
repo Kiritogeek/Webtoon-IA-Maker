@@ -620,3 +620,490 @@ Si l'utilisateur dépasse :
 ✅ un éditeur narratif vertical
 ✅ un chef d'orchestre IA
 ✅ un outil de mise en scène Webtoon
+
+---
+
+## ➕ SPÉCIFICATIONS COMPLÉMENTAIRES
+
+### 1️⃣ MODES UTILISATEUR (IMPORTANT POUR L'UX)
+
+#### 🎚️ Modes d'édition
+
+Le produit doit proposer 2 modes UX, sans changer la structure :
+
+#### 🟢 Mode Standard (par défaut)
+
+Destiné à 90 % des utilisateurs.
+
+**Caractéristiques :**
+- Aucune notion technique visible
+- IA proactive
+- Champs simplifiés
+- Pas de paramètres avancés
+
+#### 🔵 Mode Avancé (optionnel)
+
+Pour utilisateurs experts / jury / power users.
+
+**Débloque :**
+- Édition fine des prompts (texte libre)
+- Réglages avancés de panel
+- Override ponctuel des objectifs (avec warning)
+
+👉 **Le mode Avancé ne doit JAMAIS être nécessaire pour créer un Webtoon complet.**
+
+**Implémentation :**
+- Toggle dans les paramètres du projet
+- Mode persistant par projet
+- Interface adaptative selon le mode
+
+---
+
+### 2️⃣ SYSTÈME DE VARIANTES (CLÉ POUR L'IA)
+
+#### 🔁 Principe
+
+**Règle absolue :** Aucune génération IA n'écrase jamais un contenu existant.
+
+Chaque génération crée une variante.
+
+#### Variantes applicables à :
+- Couverture
+- Panel
+- Transition
+- Asset
+- Personnage (pose / émotion)
+
+#### UX des variantes
+
+**Affichage :**
+- Variantes visibles sous forme de thumbnails
+- Sélection = activation
+- Historique conservé
+- Comparaison côte à côte possible
+
+**Actions :**
+- Créer une nouvelle variante
+- Basculer entre variantes
+- Supprimer une variante (avec confirmation)
+- Dupliquer une variante
+
+👉 **Zéro frustration, zéro perte.**
+
+---
+
+### 3️⃣ SYSTÈME DE VALIDATION SILENCIEUSE
+
+#### 🧠 Validation automatique (non bloquante)
+
+À chaque action IA, le système vérifie automatiquement :
+
+**Vérifications :**
+- Objectifs du projet
+- Cohérence visuelle
+- Règles Webtoon
+- Temps de lecture
+- Densité narrative
+
+**Si problème détecté :**
+
+❌ **Pas de blocage**
+
+✅ **Warning discret** (badge, icône, message subtil)
+
+✅ **Suggestion IA** proposée automatiquement
+
+#### Exemples de warnings :
+
+- "Ce chapitre dépasse le temps cible"
+- "Trop de personnages introduits"
+- "Rythme trop dense pour une scène d'émotion"
+- "Cohérence visuelle : écart détecté avec l'identité"
+- "Objectif non respecté : densité trop faible"
+
+**Affichage :**
+- Badge discret sur l'élément concerné
+- Message contextuel dans la sidebar
+- Option "Corriger automatiquement" proposée
+
+---
+
+### 4️⃣ DÉFINITION TECHNIQUE DU TEMPS DE LECTURE (OBLIGATOIRE)
+
+#### ⏱️ Temps de lecture estimé
+
+Le système doit calculer automatiquement le temps de lecture à partir de :
+
+**Facteurs :**
+- Nombre de panels
+- Hauteur des transitions
+- Quantité de texte
+- Densité visuelle
+- Complexité narrative
+
+#### Formule conceptuelle (abstraite, non visible user)
+
+```
+Temps lecture =
+  Σ (panel_time)
+  + Σ (transition_height × facteur_rythme)
+  + Σ (texte × facteur_lecture)
+  + Σ (densité_visuelle × facteur_complexité)
+```
+
+**Calcul par panel :**
+- Panel simple : ~2-3 secondes
+- Panel avec dialogue : ~5-8 secondes
+- Panel action dense : ~3-5 secondes
+
+**Calcul par transition :**
+- Transition courte : ~1 seconde
+- Transition longue (pause) : ~3-5 secondes
+
+#### Utilisation de l'estimation
+
+Cette estimation alimente :
+- **Objectifs** : vérification du respect des temps cibles
+- **IA** : suggestions de découpage et rythme
+- **Warnings UX** : alertes si dépassement
+- **Prévisualisation** : affichage du temps estimé
+
+👉 **L'utilisateur ne voit jamais la formule, seulement le résultat.**
+
+---
+
+### 5️⃣ PANELS — TYPOLOGIE NARRATIVE
+
+#### Classification automatique
+
+Chaque panel possède un type narratif implicite :
+
+**Types :**
+- **Introduction** : Présentation, mise en contexte
+- **Action** : Mouvement, dynamisme
+- **Dialogue** : Échange verbal
+- **Pause** : Respiration narrative
+- **Climax** : Point culminant
+- **Transition narrative** : Passage entre scènes
+
+#### Utilisation
+
+**Aide l'IA à :**
+- Proposer le bon cadrage
+- Équilibrer le chapitre
+- Respecter le rythme narratif
+
+**Jamais demandé explicitement à l'utilisateur** (auto-déduit par l'IA)
+
+**Détection automatique :**
+- Analyse du contenu (personnages, texte, action)
+- Contexte narratif (position dans le chapitre)
+- Suggestions de type si ambiguïté
+
+---
+
+### 6️⃣ RÈGLES D'INTELLIGENCE VISUELLE AUTOMATIQUE
+
+#### Harmonisation automatique
+
+Le système doit automatiquement :
+
+**Harmonisation :**
+- Luminosité entre panels proches
+- Contrastes pour la lecture mobile
+- Éviter les ruptures visuelles non justifiées
+- Cohérence des couleurs dominantes
+
+**Ajustements :**
+- Correction automatique des écarts de luminosité
+- Optimisation des contrastes texte/fond
+- Lissage des transitions visuelles
+
+👉 **L'utilisateur ne règle jamais ces points manuellement.**
+
+**Transparence :**
+- Option "Afficher les ajustements automatiques" (mode avancé)
+- Log des corrections appliquées (optionnel)
+
+---
+
+### 7️⃣ GESTION DES TEXTES & DIALOGUES (MANQUANT)
+
+#### ✍️ Textes possibles
+
+**Types de texte :**
+- **Texte narratif** : Description, voix off
+- **Dialogue** : Bulles de dialogue
+- **Onomatopées** : Effets sonores visuels
+
+#### Règles UX
+
+**Appartenance :**
+- Le texte appartient **TOUJOURS** à un panel
+- Impossible de créer un texte orphelin
+
+**Édition :**
+- Drag & drop depuis la sidebar
+- Redimensionnement direct sur canvas
+- Positionnement libre dans le panel
+- Styles prédéfinis (bulles, narration, onomatopées)
+
+#### IA des textes
+
+**Capacités :**
+- Reformulation
+- Raccourcissement
+- Adaptation au rythme du chapitre
+- Suggestions de dialogues cohérents
+- Vérification de la lisibilité
+
+**Actions contextuelles :**
+- "Raccourcir pour accélérer le rythme"
+- "Reformuler plus naturellement"
+- "Adapter au style du personnage"
+
+---
+
+### 8️⃣ EXPORT & PRÉVISUALISATION (INDISPENSABLE)
+
+#### 👀 Prévisualisation Webtoon
+
+**Mode lecture plein écran :**
+- Scroll naturel
+- Sans grilles ni UI
+- Expérience lecteur authentique
+- Navigation fluide
+- Affichage du temps de lecture
+
+**Fonctionnalités :**
+- Mode sombre/clair
+- Vitesse de scroll ajustable
+- Pause automatique sur panels complexes
+- Indicateur de progression
+
+#### 📤 Exports
+
+**Formats disponibles :**
+
+1. **Export chapitre** (images découpées)
+   - Panels individuels
+   - Format PNG haute résolution
+   - Nommage automatique
+
+2. **Export série** (zip)
+   - Tous les chapitres
+   - Structure organisée
+   - Métadonnées incluses
+
+3. **Export format plateforme** (futur)
+   - LINE Webtoon
+   - Webtoon Canvas
+   - Formats spécifiques plateformes
+
+**Options d'export :**
+- Résolution (HD, Full HD, 4K)
+- Qualité de compression
+- Inclusion des métadonnées
+- Watermark optionnel
+
+---
+
+### 9️⃣ SYSTÈME DE BLOCS INTELLIGENTS
+
+#### Concept
+
+Tout élément posé sur le canvas est un **bloc intelligent**.
+
+**Types de blocs :**
+- Panel
+- Transition
+- Texte
+- Asset
+
+#### Propriétés communes
+
+Chaque bloc possède :
+
+**Actions :**
+- Sélectionnable
+- Duplicable
+- Supprimable
+- Améliorable via IA
+
+**Propriétés :**
+- Position
+- Taille
+- Opacité
+- Ordre de superposition
+- Métadonnées (type, contexte)
+
+**Interactions :**
+- Clic → Sélection + panneau latéral
+- Double-clic → Édition directe
+- Drag → Déplacement
+- Resize → Redimensionnement
+
+#### IA contextuelle par bloc
+
+Chaque bloc peut recevoir des suggestions IA spécifiques :
+- Panel : "Améliorer la composition"
+- Transition : "Allonger pour accentuer la tension"
+- Texte : "Raccourcir pour accélérer"
+- Asset : "Ajuster la taille pour l'équilibre"
+
+---
+
+### 🔟 RÈGLES ABSOLUES D'INTERACTION IA (À AJOUTER)
+
+#### Contraintes IA
+
+L'IA :
+
+❌ **Ne génère jamais sans contexte**
+- Toujours utiliser le contexte du projet
+- Toujours respecter l'identité visuelle
+- Toujours tenir compte des objectifs
+
+❌ **Ne modifie jamais plusieurs éléments sans demande**
+- Action locale uniquement
+- Pas de modifications en cascade non sollicitées
+
+✅ **Agit localement**
+- Sur l'élément sélectionné
+- Avec contexte limité mais pertinent
+
+✅ **Explique ce qu'elle fait**
+- Message clair après chaque action
+- Justification des choix
+
+#### UX attendue
+
+**Messages IA :**
+- "J'ai allongé la transition pour accentuer la tension."
+- "J'ai ajusté la luminosité pour améliorer la cohérence."
+- "J'ai raccourci le dialogue pour respecter le rythme cible."
+
+**Transparence :**
+- Affichage des modifications apportées
+- Option "Annuler" toujours disponible
+- Historique des actions IA
+
+---
+
+### 1️⃣1️⃣ LOGIQUE DE PROGRESSION UTILISATEUR
+
+#### Guidage implicite
+
+Le produit doit guider implicitement l'utilisateur dans cet ordre :
+
+**Ordre suggéré :**
+1. **Couverture** : Définit l'identité visuelle
+2. **Identité visuelle** : Affine le style
+3. **Objectifs** : Définit le cadre
+4. **Personnages / Lieux** : Crée les éléments réutilisables
+5. **Chapitres** : Assemble le tout
+
+#### Implémentation UX
+
+**Indicateurs visuels :**
+- Badges "Recommandé" sur les étapes suivantes
+- Progression globale visible
+- Suggestions contextuelles
+
+**Sans forcer :**
+- L'utilisateur peut ignorer l'ordre
+- Pas de blocage si étape sautée
+- Warnings discrets si ordre non respecté
+
+**Aide contextuelle :**
+- Tooltips explicatifs
+- Messages d'aide selon la progression
+- Suggestions intelligentes
+
+---
+
+### 1️⃣2️⃣ POSITIONNEMENT FINAL
+
+#### 🎯 Vision produit
+
+**Webtoon AI Maker n'est pas un outil de génération.**
+
+**C'est :**
+- Un **éditeur narratif vertical** assisté par IA
+- Pensé pour le **rythme**
+- Optimisé pour la **lecture mobile**
+- Garant de la **cohérence visuelle**
+
+#### Différenciation
+
+**Ce qui nous différencie :**
+- Compréhension profonde du format Webtoon
+- Intelligence contextuelle (pas juste génération)
+- Édition narrative, pas juste visuelle
+- Respect des contraintes créatives
+
+**Notre promesse :**
+Permettre à n'importe qui de créer un Webtoon professionnel, cohérent et captivant, sans compétences techniques ou artistiques.
+
+---
+
+## 🧠 INSTRUCTION SYSTÈME — RÈGLES D'IMPLÉMENTATION
+
+### ⚠️ RÈGLE ABSOLUE
+
+**Toute implémentation, refactorisation ou ajout de fonctionnalité DOIT respecter strictement les règles définies dans ce document.**
+
+### 🔄 Conflits avec le code existant
+
+**Si une logique existante entre en conflit avec ce document :**
+- Elle doit être **adaptée** pour respecter les règles
+- Ou **supprimée** si incompatible
+
+### ✅ Principes à toujours respecter
+
+L'éditeur doit toujours rester :
+
+1. **Orienté panels + transitions**
+   - Pas de canvas libre sans structure
+   - Panels et transitions comme unités de base
+
+2. **Cohérent visuellement**
+   - Automatisation de la cohérence
+   - Respect de l'identité visuelle
+
+3. **Guidé par les Objectifs**
+   - Toutes les actions vérifient les objectifs
+   - Warnings si dépassement
+
+4. **Assisté par une IA contextuelle locale**
+   - IA agit sur l'élément sélectionné
+   - Pas de génération sans contexte
+   - Explications claires
+
+### 📋 Checklist avant toute modification
+
+- [ ] Respecte-t-elle les modes utilisateur (Standard/Avancé) ?
+- [ ] Crée-t-elle des variantes au lieu d'écraser ?
+- [ ] Vérifie-t-elle les objectifs automatiquement ?
+- [ ] Calcule-t-elle le temps de lecture ?
+- [ ] Respecte-t-elle la typologie narrative des panels ?
+- [ ] Applique-t-elle l'intelligence visuelle automatique ?
+- [ ] Gère-t-elle les textes correctement ?
+- [ ] Permet-elle l'export et la prévisualisation ?
+- [ ] Traite-t-elle les éléments comme des blocs intelligents ?
+- [ ] L'IA agit-elle localement et explique-t-elle ses actions ?
+- [ ] Guide-t-elle la progression utilisateur ?
+- [ ] Respecte-t-elle le positionnement produit ?
+
+### 🎯 Objectif final
+
+**Créer un outil qui :**
+- Rend la création de Webtoon accessible à tous
+- Garantit la qualité et la cohérence
+- Respecte les contraintes créatives
+- Guide sans imposer
+- Assiste sans remplacer
+
+---
+
+**Fin du document Produit.md**

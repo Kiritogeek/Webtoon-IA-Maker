@@ -105,6 +105,11 @@ function ScenarioPageContent() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    // Ne pas exécuter côté serveur (SSR)
+    if (typeof window === 'undefined') {
+      return
+    }
+    
     if (id && typeof id === 'string') {
       // Charger TOUT en une fois si pas déjà chargé
       loadAllProjectData(id)
@@ -484,6 +489,13 @@ function ScenarioPageContent() {
       </div>
     </div>
   )
+}
+
+export async function getServerSideProps() {
+  // Désactiver le pré-rendu pour cette page dynamique
+  return {
+    props: {},
+  }
 }
 
 export default function ScenarioPage() {

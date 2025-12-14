@@ -129,13 +129,38 @@ export interface ChapterNotes {
   updated_at: string
 }
 
+export interface Asset {
+  id: string
+  project_id: string
+  name: string
+  description: string | null
+  type: 'object' | 'effect' | 'symbol' | 'environment' | 'narrative' | 'custom'
+  usage_context: string | null // combat, magie, décor, émotion, etc.
+  emotion_intensity: string | null // léger, violent, dramatique, épique
+  image_url: string
+  created_by_ai: boolean
+  created_at: string
+  updated_at: string
+}
+
 // Initialisation du client Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
+// Debug en développement pour vérifier le chargement des variables
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log('🔍 Debug - Variables d\'environnement chargées:')
+  console.log('  NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : '(vide)')
+  console.log('  NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : '(vide)')
+  console.log('  URL valide:', supabaseUrl && !supabaseUrl.includes('votre-projet') && !supabaseUrl.includes('placeholder'))
+  console.log('  Clé valide:', supabaseAnonKey && !supabaseAnonKey.includes('votre_cle') && !supabaseAnonKey.includes('placeholder'))
+}
+
 // Validation des variables d'environnement
 const isValidUrl = (url: string): boolean => {
   if (!url || url === 'your_supabase_project_url') return false
+  // Détecter les valeurs placeholder
+  if (url.includes('votre-projet') || url.includes('placeholder') || url.includes('your-project')) return false
   try {
     const parsed = new URL(url)
     return parsed.protocol === 'http:' || parsed.protocol === 'https:'
@@ -149,29 +174,84 @@ const isValidUrl = (url: string): boolean => {
 const finalUrl = isValidUrl(supabaseUrl) 
   ? supabaseUrl 
   : 'https://placeholder.supabase.co'
-const finalKey = supabaseAnonKey && supabaseAnonKey !== 'your_supabase_anon_key'
+const finalKey = supabaseAnonKey && 
+  supabaseAnonKey !== 'your_supabase_anon_key' && 
+  !supabaseAnonKey.includes('votre_cle') &&
+  !supabaseAnonKey.includes('placeholder')
   ? supabaseAnonKey 
   : 'placeholder-key'
 
-export const supabase = createClient(finalUrl, finalKey)
+// Créer le client Supabase avec gestion d'erreur
+let supabaseClient
+try {
+  supabaseClient = createClient(finalUrl, finalKey, {
+    auth: {
+      persistSession: typeof window !== 'undefined',
+      autoRefreshToken: typeof window !== 'undefined',
+      detectSessionInUrl: typeof window !== 'undefined'
+    }
+  })
+} catch (error) {
+  console.error('Erreur lors de la création du client Supabase:', error)
+  // Créer un client minimal en cas d'erreur
+  supabaseClient = createClient('https://placeholder.supabase.co', 'placeholder-key')
+}
+
+export const supabase = supabaseClient
 
 // Avertissement en développement si les variables ne sont pas configurées
-if (process.env.NODE_ENV === 'development' && (!isValidUrl(supabaseUrl) || !supabaseAnonKey || supabaseAnonKey === 'your_supabase_anon_key')) {
-  console.warn('⚠️  Supabase non configuré. Veuillez remplir les variables dans .env.local')
-  console.warn('   NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY sont requis')
+// Exécuter seulement côté serveur pour éviter les problèmes
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'development') {
+  const hasPlaceholderValues = supabaseUrl.includes('votre-projet') || 
+    supabaseUrl.includes('placeholder') || 
+    supabaseAnonKey.includes('votre_cle') || 
+    supabaseAnonKey.includes('placeholder') ||
+    supabaseAnonKey === 'your_supabase_anon_key' ||
+    supabaseUrl === 'your_supabase_project_url'
+
+  if (!isValidUrl(supabaseUrl) || !supabaseAnonKey || hasPlaceholderValues) {
+    console.warn('⚠️  Supabase non configuré. Veuillez remplir les variables dans .env.local')
+    console.warn('   NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY sont requis')
+    console.warn('')
+    if (hasPlaceholderValues) {
+      console.warn('❌ ATTENTION: Vous avez encore des valeurs PLACEHOLDER dans .env.local!')
+      console.warn('   Vous devez remplacer:')
+      console.warn('   - "https://votre-projet.supabase.co" par votre vraie URL Supabase')
+      console.warn('   - "votre_cle_anon_ici" par votre vraie clé anon')
+      console.warn('')
+    }
+    console.warn('📝 Pour configurer Supabase:')
+    console.warn('   1. Ouvrez le fichier .env.local à la racine du projet')
+    console.warn('   2. Remplacez les valeurs placeholder par vos vraies clés Supabase')
+    console.warn('      (Trouvez-les dans Supabase: Settings → API)')
+    console.warn('   3. Redémarrez le serveur (Ctrl+C puis npm run dev)')
+    console.warn('')
+    console.warn('📖 Guide complet: docs/SUPABASE_SETUP.md')
+  }
 }
 
 // Fonction utilitaire pour obtenir l'utilisateur avec gestion d'erreur
 export async function getUser() {
-  const { data: { user }, error } = await supabase.auth.getUser()
-  
-  // Si l'utilisateur n'existe plus (erreur 403), déconnecter
-  if (error && (error.message.includes('user_not_found') || error.message.includes('JWT'))) {
-    console.warn('Token invalide ou utilisateur supprimé, déconnexion...')
-    await supabase.auth.signOut()
-    return { user: null, error: null }
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser()
+    
+    // Si l'utilisateur n'existe plus (erreur 403), déconnecter
+    if (error && (error.message.includes('user_not_found') || error.message.includes('JWT'))) {
+      console.warn('Token invalide ou utilisateur supprimé, déconnexion...')
+      try {
+        await supabase.auth.signOut()
+      } catch (signOutError) {
+        // Ignorer les erreurs de déconnexion
+        console.warn('Erreur lors de la déconnexion:', signOutError)
+      }
+      return { user: null, error: null }
+    }
+    
+    return { user, error }
+  } catch (error: any) {
+    // En cas d'erreur (CORS, réseau, etc.), retourner null
+    console.warn('Erreur lors de la récupération de l\'utilisateur:', error)
+    return { user: null, error: error.message || 'Erreur inconnue' }
   }
-  
-  return { user, error }
 }
 

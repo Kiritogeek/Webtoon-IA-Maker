@@ -93,7 +93,10 @@ function PlacesPageContent() {
       setNewPlaceImagePreview(null)
       setShowCreateModal(false)
       
-      await loadPlaces()
+      // Recharger les données du projet
+      if (id && typeof id === 'string') {
+        await loadAllProjectData(id)
+      }
     } catch (error) {
       console.error('Error creating place:', error)
       alert('Erreur lors de la création du lieu')
@@ -111,7 +114,10 @@ function PlacesPageContent() {
 
       if (error) throw error
       setShowDeleteModal(null)
-      await loadPlaces()
+      // Recharger les données du projet
+      if (id && typeof id === 'string') {
+        await loadAllProjectData(id)
+      }
     } catch (error) {
       console.error('Error deleting place:', error)
       alert('Erreur lors de la suppression du lieu')

@@ -17,12 +17,13 @@ export default function Login() {
   useEffect(() => {
     checkUser()
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        router.push('/dashboard')
+      if (session?.user && router.pathname === '/auth/login') {
+        // Utiliser replace au lieu de push pour éviter les conflits
+        router.replace('/dashboard')
       }
     })
     return () => subscription.unsubscribe()
-  }, [])
+  }, [router])
 
   const checkUser = async () => {
     const { user } = await getUser()
@@ -97,7 +98,8 @@ export default function Login() {
             }
           }
           
-          router.push('/dashboard')
+          // Utiliser replace pour éviter les conflits de navigation
+          router.replace('/dashboard')
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -113,10 +115,22 @@ export default function Login() {
           throw error
         }
         
-        router.push('/dashboard')
+        // Utiliser replace pour éviter les conflits de navigation
+        router.replace('/dashboard')
       }
     } catch (error: any) {
-      setError(error.message || 'Une erreur est survenue')
+      // Vérifier si c'est une erreur de configuration Supabase
+      if (error.message?.includes('CORS') || error.message?.includes('NetworkError') || error.message?.includes('fetch') || error.message?.includes('Failed to fetch') || error.message?.includes('votre-projet')) {
+        setError('⚠️ Configuration Supabase incorrecte!\n\nLe fichier .env.local contient encore des valeurs PLACEHOLDER.\n\nVous devez:\n1. Ouvrir .env.local\n2. Remplacer "https://votre-projet.supabase.co" par votre vraie URL Supabase\n3. Remplacer "votre_cle_anon_ici" par votre vraie clé anon\n4. Redémarrer le serveur (Ctrl+C puis npm run dev)\n\nTrouvez vos clés dans Supabase: Settings → API')
+        console.error('❌ Erreur CORS - Supabase non configuré correctement')
+        console.error('📝 Le fichier .env.local contient encore des valeurs PLACEHOLDER!')
+        console.error('   Vous devez remplacer:')
+        console.error('   - "https://votre-projet.supabase.co" → votre vraie URL Supabase')
+        console.error('   - "votre_cle_anon_ici" → votre vraie clé anon')
+        console.error('   Puis redémarrer le serveur')
+      } else {
+        setError(error.message || 'Une erreur est survenue')
+      }
     } finally {
       setLoading(false)
     }

@@ -43,7 +43,10 @@ function ChaptersPageContent() {
         newChapterDescription || undefined
       )
       
-      await loadChapters()
+      // Recharger les données du projet pour inclure le nouveau chapitre
+      if (id && typeof id === 'string') {
+        await loadAllProjectData(id)
+      }
       
       // Rediriger vers l'éditeur du nouveau chapitre
       router.push(`/project/${id}/chapter/${data.id}`)
@@ -75,7 +78,10 @@ function ChaptersPageContent() {
         description: newChapterDescription || undefined,
       })
       
-      await loadChapters()
+      // Recharger les données du projet
+      if (id && typeof id === 'string') {
+        await loadAllProjectData(id)
+      }
       setShowEditModal(false)
       setEditingChapter(null)
       setNewChapterTitle('')
@@ -99,7 +105,10 @@ function ChaptersPageContent() {
     setDeleting(true)
     try {
       await deleteChapter(deletingChapter.id)
-      await loadChapters()
+      // Recharger les données du projet
+      if (id && typeof id === 'string') {
+        await loadAllProjectData(id)
+      }
       setShowDeleteModal(false)
       setDeletingChapter(null)
     } catch (error) {

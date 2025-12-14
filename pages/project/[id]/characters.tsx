@@ -136,7 +136,10 @@ function CharactersPageContent() {
       setNewCharacterImagePreview(null)
       setShowCreateModal(false)
       
-      await loadCharacters()
+      // Recharger les données du projet
+      if (id && typeof id === 'string') {
+        await loadAllProjectData(id)
+      }
     } catch (error) {
       console.error('Error creating character:', error)
       alert('Erreur lors de la création du personnage')
@@ -154,7 +157,10 @@ function CharactersPageContent() {
 
       if (error) throw error
       setShowDeleteModal(null)
-      await loadCharacters()
+      // Recharger les données du projet
+      if (id && typeof id === 'string') {
+        await loadAllProjectData(id)
+      }
     } catch (error) {
       console.error('Error deleting character:', error)
       alert('Erreur lors de la suppression du personnage')

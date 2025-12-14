@@ -19,30 +19,72 @@ export default function Home() {
   }, [])
 
   const checkUser = async () => {
-    const { user } = await getUser()
-    setUser(user)
+    // Ne pas exécuter côté serveur (SSR)
+    if (typeof window === 'undefined') {
+      return
+    }
     
-    if (user) {
-      // Charger le profil utilisateur
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle()
+    try {
+      const { user, error: userError } = await getUser()
       
-      if (profileError) {
-        console.error('Error loading user profile:', profileError)
-        // Si le profil n'existe pas, on continue sans profil
+      // Si erreur lors de la récupération de l'utilisateur, continuer sans utilisateur
+      if (userError) {
+        console.warn('Erreur lors de la récupération de l\'utilisateur:', userError)
+        setUser(null)
         setUserProfile(null)
-      } else {
-        setUserProfile(profile)
+        return
       }
+      
+      setUser(user)
+      
+      if (user) {
+        try {
+          // Charger le profil utilisateur
+          const { data: profile, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle()
+          
+          if (profileError) {
+            // Si erreur CORS ou configuration, ignorer
+            if (profileError.message?.includes('CORS') || profileError.message?.includes('NetworkError') || profileError.message?.includes('fetch')) {
+              console.warn('Erreur CORS - Supabase non configuré, profil non chargé')
+              setUserProfile(null)
+              return
+            }
+            console.error('Error loading user profile:', profileError)
+            // Si le profil n'existe pas, on continue sans profil
+            setUserProfile(null)
+          } else {
+            setUserProfile(profile)
+          }
+        } catch (profileErr) {
+          console.error('Error loading user profile:', profileErr)
+          setUserProfile(null)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user:', error)
+      // En cas d'erreur, continuer sans utilisateur
+      setUser(null)
+      setUserProfile(null)
     }
   }
 
   const loadProjects = async () => {
+    // Ne pas exécuter côté serveur (SSR)
+    if (typeof window === 'undefined') {
+      return
+    }
+    
     try {
-      const { user } = await getUser()
+      const { user, error: userError } = await getUser()
+      
+      // Si erreur lors de la récupération de l'utilisateur, continuer sans utilisateur
+      if (userError) {
+        console.warn('Erreur lors de la récupération de l\'utilisateur:', userError)
+      }
       
       if (!user) {
         const { data, error } = await supabase
@@ -51,7 +93,17 @@ export default function Home() {
           .order('created_at', { ascending: false })
           .limit(3)
 
-        if (error) throw error
+        if (error) {
+          // Si erreur CORS ou configuration, ne pas bloquer
+          if (error.message?.includes('CORS') || error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
+            console.warn('Erreur CORS - Supabase non configuré, projets non chargés')
+            setProjects([])
+            return
+          }
+          console.error('Error loading projects:', error)
+          setProjects([])
+          return
+        }
         setProjects(data || [])
       } else {
         const { data, error } = await supabase
@@ -61,11 +113,23 @@ export default function Home() {
           .order('created_at', { ascending: false })
           .limit(3)
 
-        if (error) throw error
+        if (error) {
+          // Si erreur CORS ou configuration, ne pas bloquer
+          if (error.message?.includes('CORS') || error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
+            console.warn('Erreur CORS - Supabase non configuré, projets non chargés')
+            setProjects([])
+            return
+          }
+          console.error('Error loading projects:', error)
+          setProjects([])
+          return
+        }
         setProjects(data || [])
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading projects:', error)
+      // En cas d'erreur, initialiser avec un tableau vide
+      setProjects([])
     }
   }
 

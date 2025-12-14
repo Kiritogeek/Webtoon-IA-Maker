@@ -15,11 +15,17 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   useEffect(() => {
     checkUser()
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      const newUser = session?.user ?? null
+      setUser(newUser)
       setLoading(false)
+      
+      // Rediriger seulement si on n'est pas déjà sur la page de login
+      if (!newUser && router.pathname !== '/auth/login') {
+        router.replace('/auth/login')
+      }
     })
     return () => subscription.unsubscribe()
-  }, [])
+  }, [router])
 
   const checkUser = async () => {
     const { user } = await getUser()
@@ -36,7 +42,10 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   }
 
   if (!user) {
-    router.push('/auth/login')
+    // Utiliser replace pour éviter les conflits
+    if (router.pathname !== '/auth/login') {
+      router.replace('/auth/login')
+    }
     return null
   }
 

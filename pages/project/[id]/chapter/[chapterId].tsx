@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabase'
 import type { Chapter, Character, Scene, Project } from '@/lib/supabase'
-import WebtoonPanelEditor from '@/components/WebtoonPanelEditor'
+import dynamic from 'next/dynamic'
+
+const WebtoonPanelEditor = dynamic(() => import('@/components/WebtoonPanelEditor'), {
+  ssr: false,
+})
 import AuthGuard from '@/components/AuthGuard'
 import ProjectSidebar from '@/components/project/ProjectSidebar'
 import ProjectTopbar from '@/components/project/ProjectTopbar'
@@ -20,6 +24,11 @@ function ChapterPageContent() {
   const [newSceneTitle, setNewSceneTitle] = useState('')
 
   useEffect(() => {
+    // Ne pas exécuter côté serveur (SSR)
+    if (typeof window === 'undefined') {
+      return
+    }
+    
     if (chapterId && id) {
       loadProject()
       loadChapter()
@@ -299,6 +308,13 @@ function ChapterPageContent() {
       )}
     </div>
   )
+}
+
+export async function getServerSideProps() {
+  // Désactiver le pré-rendu pour cette page dynamique
+  return {
+    props: {},
+  }
 }
 
 export default function ChapterPage() {

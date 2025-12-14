@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import type { Project, Character, Chapter, Scene, Place, Scenario, ChapterNotes, ProjectVisualReference } from '@/lib/supabase'
+import type { Project, Character, Chapter, Scene, Place, Scenario, ChapterNotes, ProjectVisualReference, Asset } from '@/lib/supabase'
 
 interface ProjectState {
   project: Project | null
@@ -8,10 +8,15 @@ interface ProjectState {
   chapters: Chapter[]
   scenes: Scene[]
   places: Place[]
+  assets: Asset[]
   scenario: Scenario | null
   chapterNotes: ChapterNotes[]
   loading: boolean
   currentProjectId: string | null
+  tablesExist: {
+    scenario: boolean | null
+    chapterNotes: boolean | null
+  }
   
   // Actions
   setProject: (project: Project | null) => void
@@ -19,6 +24,7 @@ interface ProjectState {
   setChapters: (chapters: Chapter[]) => void
   setScenes: (scenes: Scene[]) => void
   setPlaces: (places: Place[]) => void
+  setAssets: (assets: Asset[]) => void
   setScenario: (scenario: Scenario | null) => void
   setChapterNotes: (chapterNotes: ChapterNotes[]) => void
   setLoading: (loading: boolean) => void
@@ -40,6 +46,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   chapters: [],
   scenes: [],
   places: [],
+  assets: [],
   scenario: null,
   chapterNotes: [],
   loading: false,
@@ -54,6 +61,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setChapters: (chapters) => set({ chapters }),
   setScenes: (scenes) => set({ scenes }),
   setPlaces: (places) => set({ places }),
+  setAssets: (assets) => set({ assets }),
   setScenario: (scenario) => set({ scenario }),
   setChapterNotes: (chapterNotes) => set({ chapterNotes }),
   setLoading: (loading) => set({ loading }),
@@ -83,6 +91,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       chapters: [],
       scenes: [],
       places: [],
+      assets: [],
       scenario: null,
       chapterNotes: [],
       loading: true,
@@ -96,12 +105,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         charactersResult,
         chaptersResult,
         placesResult,
+        assetsResult,
         visualReferencesResult
       ] = await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase.from('characters').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
         supabase.from('chapters').select('*').eq('project_id', projectId).order('order', { ascending: true }),
         supabase.from('places').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+        supabase.from('assets').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
         supabase.from('project_visual_references').select('*').eq('project_id', projectId).order('display_order', { ascending: true })
       ])
       
@@ -130,10 +141,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         set({ places: placesResult.data || [] })
       }
       
+      if (!assetsResult.error) {
+        set({ assets: assetsResult.data || [] })
+      }
+      
       // Charger les données optionnelles (scenario et chapter_notes) seulement si on ne sait pas qu'elles n'existent pas
       // Utiliser localStorage pour persister le cache entre les rafraîchissements
       const cacheKey = `tables_exist_${projectId}`
-      let cachedTablesExist = state.tablesExist
+      let cachedTablesExist = state.tablesExist || {
+        scenario: null,
+        chapterNotes: null
+      }
       
       // Charger depuis localStorage si disponible
       if (typeof window !== 'undefined') {
@@ -162,9 +180,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             }
           } else if (scenarioResult.error) {
             // Vérifier si c'est une erreur de table inexistante
-            const isTableMissing = scenarioResult.error.status === 404 || 
-                                 scenarioResult.error.code === 'PGRST205' || 
-                                 scenarioResult.error.code === '42P01'
+            const isTableMissing = scenarioResult.error.code === 'PGRST205' || 
+                                 scenarioResult.error.code === '42P01' ||
+                                 scenarioResult.error.message?.includes('relation') ||
+                                 scenarioResult.error.message?.includes('does not exist')
             if (isTableMissing) {
               // Marquer que la table n'existe pas pour éviter les futures requêtes
               const newCache = { ...cachedTablesExist, scenario: false }
@@ -191,9 +210,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             }
           } else {
             // Vérifier si c'est une erreur de table inexistante
-            const isTableMissing = chapterNotesResult.error.status === 404 || 
-                                 chapterNotesResult.error.code === 'PGRST205' || 
-                                 chapterNotesResult.error.code === '42P01'
+            const isTableMissing = chapterNotesResult.error.code === 'PGRST205' || 
+                                 chapterNotesResult.error.code === '42P01' ||
+                                 chapterNotesResult.error.message?.includes('relation') ||
+                                 chapterNotesResult.error.message?.includes('does not exist')
             if (isTableMissing) {
               // Marquer que la table n'existe pas pour éviter les futures requêtes
               const newCache = { ...cachedTablesExist, chapterNotes: false }

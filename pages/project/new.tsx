@@ -4,25 +4,66 @@ import { supabase, getUser } from '@/lib/supabase'
 import { GENRES, AMBIANCES, STYLES_GRAPHIQUES, type ProjectConfig } from '@/lib/projectConfig'
 import { getAllBackgroundPresets, getBackgroundPresetLabel, getProjectBackground, type BackgroundPreset } from '@/lib/backgroundPresets'
 
-// Fonction helper pour obtenir les templates d'images selon le style depuis Supabase Storage
-// Utilise le client Supabase pour obtenir les URLs publiques correctement
-// Structure attendue : style-references/style-examples/{style}/exemple-{1-3}.{jpg|webp}
-const getStyleExamples = async (styleValue: string): Promise<string[]> => {
+// Interface pour les designs de webtoon
+interface WebtoonDesign {
+  id: string
+  name: string
+  description?: string
+  imageUrl: string
+  style: string
+  category?: string
+  tags?: string[]
+}
+
+// Fonction helper pour obtenir les templates d'images depuis l'API externe ou Supabase Storage
+// Priorité : API externe > Supabase Storage > Placeholder
+const getStyleExamples = async (styleValue: string): Promise<{ imageUrl: string; design?: WebtoonDesign }[]> => {
+  // Ne pas exécuter côté serveur (SSR)
+  if (typeof window === 'undefined') {
+    return []
+  }
+  
+  try {
+    // Essayer d'appeler l'API externe
+    const response = await fetch(`/api/webtoon-designs?style=${encodeURIComponent(styleValue)}`)
+    
+    if (response.ok) {
+      const data = await response.json()
+      if (data.designs && data.designs.length > 0) {
+        // Retourner les designs de l'API avec leurs métadonnées
+        return data.designs.map((design: WebtoonDesign) => ({
+          imageUrl: design.imageUrl,
+          design: design,
+        }))
+      }
+    }
+    
+    // Fallback vers Supabase Storage si l'API n'a pas retourné de résultats
+    return await getStyleExamplesFromSupabase(styleValue)
+  } catch (error) {
+    console.error('Error getting style examples from API:', error)
+    // Fallback vers Supabase Storage en cas d'erreur
+    return await getStyleExamplesFromSupabase(styleValue)
+  }
+}
+
+// Fonction de fallback vers Supabase Storage
+const getStyleExamplesFromSupabase = async (styleValue: string): Promise<{ imageUrl: string; design?: WebtoonDesign }[]> => {
+  // Ne pas exécuter côté serveur (SSR)
+  if (typeof window === 'undefined') {
+    return []
+  }
+  
   const bucketName = 'style-references'
   
   try {
-    // Utiliser le client Supabase pour obtenir les URLs publiques
-    // Structure : style-examples/{style}/exemple-{num}.{ext}
     const getSupabaseImageUrl = (style: string, exampleNum: number, ext: string = 'jpg') => {
       const filePath = `style-examples/${style}/exemple-${exampleNum}.${ext}`
       const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath)
-      // Retourner l'URL sans paramètre de timestamp pour éviter les problèmes de cache
-      // Les attributs crossOrigin et referrerPolicy sur les balises <img> gèrent les cookies
       return data.publicUrl
     }
     
     // Retourner les URLs Supabase pour chaque style
-    // Note: Les extensions peuvent varier (jpg, webp), on essaie les deux
     const examples: Record<string, string[]> = {
       'webtoon-standard': [
         getSupabaseImageUrl('webtoon-standard', 1, 'jpg'),
@@ -56,16 +97,50 @@ const getStyleExamples = async (styleValue: string): Promise<string[]> => {
       ],
     }
     
-    return examples[styleValue] || []
+    const urls = examples[styleValue] || []
+    return urls.map((url, index) => ({
+      imageUrl: url,
+      design: {
+        id: `supabase-${styleValue}-${index + 1}`,
+        name: `Template ${index + 1}`,
+        description: `Template de référence pour le style ${styleValue}`,
+        imageUrl: url,
+        style: styleValue,
+      },
+    }))
   } catch (error) {
-    console.error('Error getting style examples:', error)
-    // Fallback vers placeholder si erreur
+    console.error('Error getting style examples from Supabase:', error)
+    // Dernier fallback vers placeholder
     const styleColor = STYLES_GRAPHIQUES.find(s => s.value === styleValue)?.color || '#FF6B6B'
     const colorHex = styleColor.replace('#', '')
     return [
-      `https://via.placeholder.com/400x600/${colorHex}/FFFFFF?text=Exemple+1`,
-      `https://via.placeholder.com/400x600/${colorHex}/FFFFFF?text=Exemple+2`,
-      `https://via.placeholder.com/400x600/${colorHex}/FFFFFF?text=Exemple+3`,
+      {
+        imageUrl: `https://via.placeholder.com/400x600/${colorHex}/FFFFFF?text=Exemple+1`,
+        design: {
+          id: `placeholder-${styleValue}-1`,
+          name: 'Exemple 1',
+          imageUrl: `https://via.placeholder.com/400x600/${colorHex}/FFFFFF?text=Exemple+1`,
+          style: styleValue,
+        },
+      },
+      {
+        imageUrl: `https://via.placeholder.com/400x600/${colorHex}/FFFFFF?text=Exemple+2`,
+        design: {
+          id: `placeholder-${styleValue}-2`,
+          name: 'Exemple 2',
+          imageUrl: `https://via.placeholder.com/400x600/${colorHex}/FFFFFF?text=Exemple+2`,
+          style: styleValue,
+        },
+      },
+      {
+        imageUrl: `https://via.placeholder.com/400x600/${colorHex}/FFFFFF?text=Exemple+3`,
+        design: {
+          id: `placeholder-${styleValue}-3`,
+          name: 'Exemple 3',
+          imageUrl: `https://via.placeholder.com/400x600/${colorHex}/FFFFFF?text=Exemple+3`,
+          style: styleValue,
+        },
+      },
     ]
   }
 }
@@ -97,7 +172,7 @@ function NewProjectContent() {
   const [isSubmitting, setIsSubmitting] = useState(false) // Indique si on est en train de soumettre (animation de disparition)
   const [showSuccess, setShowSuccess] = useState(false) // Affiche le popup de succès
   const [gradientVisible, setGradientVisible] = useState(false) // Contrôle l'animation du dégradé
-  const [styleExamples, setStyleExamples] = useState<string[]>([]) // Exemples d'images pour le style sélectionné
+  const [styleExamples, setStyleExamples] = useState<{ imageUrl: string; design?: WebtoonDesign }[]>([]) // Exemples d'images pour le style sélectionné
   const [loadingExamples, setLoadingExamples] = useState(false) // Chargement des exemples
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState<number | null>(null) // Index du template sélectionné
   
@@ -124,14 +199,23 @@ function NewProjectContent() {
 
   // Charger les exemples quand un style est sélectionné
   useEffect(() => {
+    // Ne pas exécuter côté serveur (SSR)
+    if (typeof window === 'undefined') {
+      return
+    }
+    
     if (config.style_graphique && config.style_graphique !== 'custom') {
       setLoadingExamples(true)
-      getStyleExamples(config.style_graphique).then(examples => {
-        setStyleExamples(examples)
-        setLoadingExamples(false)
-      }).catch(() => {
-        setLoadingExamples(false)
-      })
+      getStyleExamples(config.style_graphique)
+        .then(examples => {
+          setStyleExamples(examples)
+          setLoadingExamples(false)
+        })
+        .catch((error) => {
+          console.error('Error loading style examples:', error)
+          setStyleExamples([])
+          setLoadingExamples(false)
+        })
     } else {
       setStyleExamples([])
       setSelectedTemplateIndex(null)
@@ -827,20 +911,22 @@ function NewProjectContent() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 gap-4">
-                      {styleExamples.map((imageUrl: string, index: number) => {
+                      {styleExamples.map((example, index: number) => {
                         const isSelected = selectedTemplateIndex === index
                         const styleColor = STYLES_GRAPHIQUES.find(s => s.value === config.style_graphique)?.color || '#FF6B6B'
                         const colorHex = styleColor.replace('#', '')
+                        const design = example.design
+                        
                         return (
                           <button
-                            key={index}
+                            key={design?.id || index}
                             type="button"
                             onClick={() => {
                               setSelectedTemplateIndex(index)
                               // Sauvegarder l'URL du template sélectionné dans l'identité visuelle
                               setConfig({
                                 ...config,
-                                identity_visual_reference_url: imageUrl
+                                identity_visual_reference_url: example.imageUrl
                               })
                             }}
                             className={`relative aspect-[2/3] rounded-xl overflow-hidden border-2 transition group ${
@@ -850,8 +936,8 @@ function NewProjectContent() {
                             }`}
                           >
                             <img
-                              src={imageUrl}
-                              alt={`Template ${index + 1} du style ${STYLES_GRAPHIQUES.find(s => s.value === config.style_graphique)?.label}`}
+                              src={example.imageUrl}
+                              alt={design?.name || `Template ${index + 1} du style ${STYLES_GRAPHIQUES.find(s => s.value === config.style_graphique)?.label}`}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               crossOrigin="anonymous"
                               referrerPolicy="no-referrer"
@@ -883,8 +969,13 @@ function NewProjectContent() {
                                   ? 'bg-primary text-white' 
                                   : 'bg-black/60 text-white/80'
                               }`}>
-                                Template {index + 1}
+                                {design?.name || `Template ${index + 1}`}
                               </div>
+                              {design?.description && (
+                                <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 text-white/80 text-xs mt-1 text-center line-clamp-2">
+                                  {design.description}
+                                </div>
+                              )}
                             </div>
                           </button>
                         )
@@ -1197,6 +1288,13 @@ function NewProjectContent() {
       </div>
     </div>
   )
+}
+
+export async function getServerSideProps() {
+  // Désactiver le pré-rendu pour cette page dynamique
+  return {
+    props: {},
+  }
 }
 
 export default function NewProject() {

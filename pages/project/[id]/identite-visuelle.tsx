@@ -1,18 +1,23 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { supabase, getUser, type Project, type ProjectVisualReference } from '@/lib/supabase'
+import { supabase, getUser, type ProjectVisualReference } from '@/lib/supabase'
 import AuthGuard from '@/components/AuthGuard'
 import ProjectSidebar from '@/components/project/ProjectSidebar'
 import ProjectTopbar from '@/components/project/ProjectTopbar'
-import { getProjectBackground } from '@/lib/backgroundPresets'
 import { useProjectStore } from '@/lib/stores/projectStore'
 
 function IdentiteVisuellePageContent() {
+  // ============================================
+  // HOOKS & ROUTER
+  // ============================================
   const router = useRouter()
   const { id } = router.query
   const projectId = typeof id === 'string' ? id : ''
+  const { project, loadAllProjectData, updateProject } = useProjectStore()
 
-  const { project, loadAllProjectData } = useProjectStore()
+  // ============================================
+  // ÉTATS - Références visuelles
+  // ============================================
   const [references, setReferences] = useState<ProjectVisualReference[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -20,13 +25,17 @@ function IdentiteVisuellePageContent() {
   const [reordering, setReordering] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
 
-  // États pour le résumé de style
+  // ============================================
+  // ÉTATS - Résumé de style IA
+  // ============================================
   const [styleSummary, setStyleSummary] = useState<string | null>(null)
   const [generatingSummary, setGeneratingSummary] = useState(false)
   const [stylePrompt, setStylePrompt] = useState<string | null>(null)
   const [editingPrompt, setEditingPrompt] = useState(false)
 
-  // États pour l'aperçu de cohérence
+  // ============================================
+  // ÉTATS - Aperçu de cohérence
+  // ============================================
   const [coherencePreview, setCoherencePreview] = useState<{
     face?: string
     place?: string
@@ -34,17 +43,28 @@ function IdentiteVisuellePageContent() {
   } | null>(null)
   const [generatingPreview, setGeneratingPreview] = useState(false)
 
+  // ============================================
+  // ÉTATS - Sidebar (structure normalisée)
+  // ============================================
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // ============================================
+  // FONCTIONS - Chargement des données
+  // ============================================
   const loadReferences = async () => {
     if (!projectId || projectId === '') return
-
+    
     try {
       const { data, error: refError } = await supabase
         .from('project_visual_references')
         .select('*')
         .eq('project_id', projectId)
         .order('display_order', { ascending: true })
-
+      
       if (refError) throw refError
+      
+      // Les références visuelles sont chargées (le template est géré séparément via project.identity_visual_reference_url)
       setReferences(data || [])
     } catch (err: any) {
       console.error('Error loading references:', err)
@@ -56,7 +76,11 @@ function IdentiteVisuellePageContent() {
 
   useEffect(() => {
     if (projectId && projectId !== '') {
-      loadAllProjectData(projectId)
+      loadAllProjectData(projectId).catch((error) => {
+        console.error('Error loading project data:', error)
+        setError('Erreur lors du chargement du projet')
+        setLoading(false)
+      })
       loadReferences()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,6 +93,9 @@ function IdentiteVisuellePageContent() {
     }
   }, [project])
 
+  // ============================================
+  // FONCTIONS - Gestion des références visuelles
+  // ============================================
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !projectId) return
@@ -166,10 +193,13 @@ function IdentiteVisuellePageContent() {
         // Plus de références : réinitialiser le résumé
         setStyleSummary(null)
         if (project) {
-          await supabase
+          const { error: updateError } = await supabase
             .from('projects')
             .update({ visual_style_summary: null })
             .eq('id', projectId)
+          if (updateError) {
+            console.error('Error clearing style summary:', updateError)
+          }
         }
       }
     } catch (err: any) {
@@ -221,8 +251,23 @@ function IdentiteVisuellePageContent() {
     }
   }
 
-  const generateStyleSummary = async (refs: ProjectVisualReference[] = references) => {
-    if (refs.length === 0) return
+  // ============================================
+  // FONCTIONS - Génération IA
+  // ============================================
+  const generateStyleSummary = async (refs?: ProjectVisualReference[]) => {
+    const refsToUse: ProjectVisualReference[] = refs || references
+    
+    // Inclure le template de référence si disponible
+    const allImageUrls: string[] = []
+    if (project?.identity_visual_reference_url) {
+      allImageUrls.push(project.identity_visual_reference_url)
+    }
+    allImageUrls.push(...refsToUse.map(r => r.image_url))
+    
+    if (allImageUrls.length === 0) {
+      setError('Ajoutez au moins une référence visuelle ou un template pour générer le résumé')
+      return
+    }
 
     setGeneratingSummary(true)
     setError(null)
@@ -234,7 +279,7 @@ function IdentiteVisuellePageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          imageUrls: refs.map(r => r.image_url),
+          imageUrls: allImageUrls,
         }),
       })
 
@@ -257,7 +302,7 @@ function IdentiteVisuellePageContent() {
       
       // Mettre à jour le store
       if (project) {
-        useProjectStore.getState().updateProject({
+        updateProject({
           ...project,
           visual_style_summary: summary,
         })
@@ -285,7 +330,7 @@ function IdentiteVisuellePageContent() {
       
       // Mettre à jour le store
       if (project) {
-        useProjectStore.getState().updateProject({
+        updateProject({
           ...project,
           visual_style_prompt: stylePrompt,
         })
@@ -296,8 +341,15 @@ function IdentiteVisuellePageContent() {
   }
 
   const generateCoherencePreview = async () => {
-    if (references.length === 0) {
-      setError('Ajoutez au moins une référence visuelle pour générer un aperçu')
+    // Inclure le template de référence si disponible
+    const allImageUrls: string[] = []
+    if (project?.identity_visual_reference_url) {
+      allImageUrls.push(project.identity_visual_reference_url)
+    }
+    allImageUrls.push(...references.map(r => r.image_url))
+    
+    if (allImageUrls.length === 0) {
+      setError('Ajoutez au moins une référence visuelle ou un template pour générer un aperçu')
       return
     }
 
@@ -310,7 +362,7 @@ function IdentiteVisuellePageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          imageUrls: references.map(r => r.image_url),
+          imageUrls: allImageUrls,
         }),
       })
 
@@ -329,70 +381,103 @@ function IdentiteVisuellePageContent() {
     }
   }
 
+  // ============================================
+  // RENDU - États de chargement et erreurs
+  // ============================================
   if (loading) {
     return (
       <div className="min-h-screen creative-bg flex items-center justify-center">
-        <div className="text-white text-xl">Chargement...</div>
+        <div className="text-2xl gradient-text font-bold animate-pulse">Chargement...</div>
       </div>
     )
   }
 
-  if (!project || !projectId || projectId === '') {
+  if (!project || !projectId || typeof projectId !== 'string') {
     return (
       <div className="min-h-screen creative-bg flex items-center justify-center">
-        <div className="text-white text-xl">Projet non trouvé</div>
+        <div className="text-2xl gradient-text font-bold">Projet non trouvé</div>
       </div>
     )
   }
 
+  // ============================================
+  // RENDU - Structure principale (normalisée)
+  // ============================================
   return (
-    <div 
-      className="min-h-screen transition-all duration-300"
-      style={{
-        background: getProjectBackground(project),
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      }}
-    >
-        <ProjectSidebar 
-          projectId={projectId} 
-          activeSection="identity"
-          isCollapsed={sidebarCollapsed}
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          onMobileToggle={() => setSidebarOpen(!sidebarOpen)}
-          onClose={() => setSidebarOpen(false)}
+    <div className="min-h-screen creative-bg">
+      <ProjectSidebar
+        projectId={projectId}
+        activeSection="identity"
+        isCollapsed={sidebarCollapsed}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onMobileToggle={() => setSidebarOpen(!sidebarOpen)}
+        onClose={() => setSidebarOpen(false)}
+      />
+      
+      <div className={`transition-all duration-300 ${
+        sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-52'
+      }`}>
+        <ProjectTopbar
+          projectId={projectId}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        <div className={`min-h-screen transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-52'}`}>
-          <ProjectTopbar 
-            projectId={projectId}
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          />
-          
-          <div className="p-4 lg:p-8 mt-16">
-            <div className="max-w-7xl mx-auto space-y-6">
-              {/* Header */}
-              <div className="backdrop-blur-sm rounded-2xl p-6 border border-white/5">
-                <h1 className="text-3xl font-black text-white mb-2">🎨 Identité Visuelle</h1>
-                <p className="text-white/70 text-sm">
+
+        <div className="p-4 lg:p-8 mt-16">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="mb-6">
+              <div className="bg-darker/90 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/10">
+                <h1 className="text-3xl font-bold mb-2 gradient-text">🎨 Identité Visuelle</h1>
+                <p className="text-white/70">
                   Plus vous ajoutez d'images de référence, plus l'IA comprend précisément le style souhaité.
                 </p>
               </div>
+            </div>
 
-              {error && (
-                <div className="backdrop-blur-sm rounded-2xl p-4 border border-red/50 bg-red/10">
-                  <p className="text-red text-sm">{error}</p>
+            {error && (
+              <div className="mb-6 bg-red/10 backdrop-blur-sm rounded-2xl p-4 border-2 border-red/50">
+                <p className="text-red text-sm">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-6">
+
+              {/* 0. Template sélectionné dans la configuration */}
+              {project.identity_visual_reference_url && (
+                <div className="bg-darker/90 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/10">
+                  <h2 className="text-xl font-bold text-white mb-4">🎯 Template de référence</h2>
+                  <p className="text-white/60 text-sm mb-4">
+                    Template sélectionné lors de la configuration du projet. Ce template est automatiquement utilisé pour toutes les générations IA.
+                  </p>
+                  <div className="relative aspect-video rounded-xl overflow-hidden border-2 border-primary/50">
+                    <img
+                      src={project.identity_visual_reference_url}
+                      alt="Template de référence"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-2 right-2 px-3 py-1 bg-primary/80 text-white text-xs rounded-lg font-semibold">
+                      Template principal
+                    </div>
+                  </div>
+                  <p className="text-white/50 text-xs mt-3">
+                    💡 Ce template est utilisé comme référence de base pour tous les éléments générés (personnages, lieux, assets, chapitres).
+                  </p>
                 </div>
               )}
 
               {/* 1. Références visuelles du projet */}
-              <div className="backdrop-blur-sm rounded-2xl p-6 border border-white/5">
+              <div className="bg-darker/90 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/10">
                 <h2 className="text-xl font-bold text-white mb-4">📌 Références visuelles du projet</h2>
                 <p className="text-white/60 text-sm mb-4">
                   Collection d'images servant de base stylistique pour tout le projet. Minimum 1 image.
+                  {project.identity_visual_reference_url && (
+                    <span className="block mt-2 text-white/50 text-xs">
+                      💡 Le template de référence est automatiquement utilisé avec ces références pour toutes les générations IA.
+                    </span>
+                  )}
                 </p>
 
                 {/* Grille moodboard */}
@@ -450,16 +535,21 @@ function IdentiteVisuellePageContent() {
                   </label>
                 </div>
 
-                {references.length === 0 && (
+                {references.length === 0 && !project.identity_visual_reference_url && (
                   <div className="text-center py-8 text-white/50 text-sm">
                     Ajoutez au moins une image de référence pour définir l'identité visuelle de votre projet.
+                    {!project.identity_visual_reference_url && (
+                      <span className="block mt-2 text-white/40 text-xs">
+                        💡 Vous pouvez aussi sélectionner un template dans les paramètres du projet.
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* 2. Style compris par l'IA */}
-              {references.length > 0 && (
-                <div className="backdrop-blur-sm rounded-2xl p-6 border border-white/5">
+              {(references.length > 0 || project.identity_visual_reference_url) && (
+                <div className="bg-darker/90 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/10">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-bold text-white">🧠 Style compris par l'IA</h2>
                     <button
@@ -532,7 +622,7 @@ function IdentiteVisuellePageContent() {
 
               {/* 3. Règles visuelles déduites (lecture seule) */}
               {styleSummary && (
-                <div className="backdrop-blur-sm rounded-2xl p-6 border border-white/5">
+                <div className="bg-darker/90 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/10">
                   <h2 className="text-xl font-bold text-white mb-4">📋 Règles visuelles déduites</h2>
                   <p className="text-white/60 text-sm mb-4">
                     Ces règles sont déduites automatiquement et servent à verrouiller la cohérence IA.
@@ -559,8 +649,8 @@ function IdentiteVisuellePageContent() {
               )}
 
               {/* 4. Aperçu de cohérence */}
-              {references.length > 0 && (
-                <div className="backdrop-blur-sm rounded-2xl p-6 border border-white/5">
+              {(references.length > 0 || project.identity_visual_reference_url) && (
+                <div className="bg-darker/90 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/10">
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h2 className="text-xl font-bold text-white">✨ Aperçu de cohérence</h2>
@@ -613,7 +703,7 @@ function IdentiteVisuellePageContent() {
               )}
 
               {/* 5. Utilisation dans le projet */}
-              <div className="backdrop-blur-sm rounded-2xl p-6 border border-white/5">
+              <div className="bg-darker/90 backdrop-blur-sm rounded-2xl p-6 border-2 border-white/10">
                 <h2 className="text-xl font-bold text-white mb-4">🎯 Utilisation dans le projet</h2>
                 <p className="text-white/60 text-sm mb-4">
                   L'identité visuelle est automatiquement utilisée dans toutes les générations IA :

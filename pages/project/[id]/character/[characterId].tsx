@@ -209,7 +209,7 @@ function EditCharacterContent() {
         return
       }
 
-      const { imageUrl, warnings, success } = await response.json()
+      const { imageUrl, warnings, success, message } = await response.json()
 
       if (!success || !imageUrl) {
         throw new Error('Aucune image générée')
@@ -225,8 +225,10 @@ function EditCharacterContent() {
         setBodyImagePreview(imageUrl)
       }
 
-      const identityVisualReference = project.identity_visual_reference_url || project.style_reference_image_url
-      alert(`Image ${type === 'face' ? 'du visage' : 'du corps'} générée avec succès! ${identityVisualReference ? 'Style cohérent avec l\'identité visuelle du projet.' : ''}`)
+      // Afficher le message explicatif de l'IA
+      const aiMessage = message || `Image ${type === 'face' ? 'du visage' : 'du corps'} générée avec succès!`
+      const warningText = warnings && warnings.length > 0 ? `\n\n⚠️ ${warnings[0]}` : ''
+      alert(`${aiMessage}${warningText}`)
     } catch (error: any) {
       console.error('Error generating image:', error)
       alert(`Erreur lors de la génération de l'image: ${error.message || 'Erreur inconnue'}`)

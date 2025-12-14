@@ -48,10 +48,30 @@ export function buildBaseContext(project: Project): string {
   // Références visuelles (nouveau système multi-références) - RÈGLE ABSOLUE
   // Toutes les images de référence définissent le style graphique de TOUS les éléments générés
   // L'IA doit déduire le style commun à toutes ces références
-  // Fallback vers l'ancien système (identity_visual_reference_url) pour compatibilité
+  // Le template sélectionné (identity_visual_reference_url) est TOUJOURS inclus
+  const allReferences: string[] = []
+  
+  // Ajouter le template de référence en premier (priorité)
+  if (project.identity_visual_reference_url) {
+    allReferences.push(project.identity_visual_reference_url)
+  }
+  
+  // Ajouter les références visuelles supplémentaires
   if (project.visual_references && project.visual_references.length > 0) {
-    const imageUrls = project.visual_references.map((ref: any) => ref.image_url).join(', ')
+    project.visual_references.forEach((ref: any) => {
+      // Éviter les doublons si le template est déjà dans les références
+      if (ref.image_url !== project.identity_visual_reference_url) {
+        allReferences.push(ref.image_url)
+      }
+    })
+  }
+  
+  if (allReferences.length > 0) {
+    const imageUrls = allReferences.join(', ')
     contextParts.push(`Références visuelles du projet (toutes également importantes): ${imageUrls}`)
+    if (project.identity_visual_reference_url) {
+      contextParts.push(`Template principal (sélectionné dans la configuration): ${project.identity_visual_reference_url}`)
+    }
     contextParts.push('Objectif: Déduire le style graphique commun à ces références et l\'appliquer de manière cohérente à toutes les générations')
     contextParts.push('Cohérence visuelle OBLIGATOIRE: Tous les éléments générés doivent respecter le style commun déduit de ces références')
     contextParts.push('Style, couleurs, traits, proportions, textures, ambiance - TOUT doit être cohérent avec le style commun')
@@ -59,7 +79,7 @@ export function buildBaseContext(project: Project): string {
     // Fallback vers l'ancien système (1 image unique)
     const identityVisualReference = project.identity_visual_reference_url || project.style_reference_image_url
     if (identityVisualReference) {
-      contextParts.push(`Référence visuelle ABSOLUE (Identité Visuelle): ${identityVisualReference}`)
+      contextParts.push(`Référence visuelle ABSOLUE (Template de configuration): ${identityVisualReference}`)
       contextParts.push('Cohérence visuelle OBLIGATOIRE: Tous les éléments générés doivent être PARFAITEMENT cohérents avec cette image de référence')
       contextParts.push('Style, couleurs, traits, proportions, textures, ambiance - TOUT doit correspondre exactement à cette référence')
     }

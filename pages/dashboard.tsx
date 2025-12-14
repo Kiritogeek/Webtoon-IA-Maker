@@ -17,31 +17,50 @@ function DashboardContent() {
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
 
   useEffect(() => {
-    checkUser()
-    loadProjects()
+    let mounted = true
+    
+    const init = async () => {
+      await checkUser()
+      if (mounted) {
+        await loadProjects()
+      }
+    }
+    
+    init()
+    
+    return () => {
+      mounted = false
+    }
   }, [])
 
   const checkUser = async () => {
-    const { user } = await getUser()
-    setUser(user)
-    if (!user) {
-      router.push('/auth/login')
-      return
-    }
-    
-    // Charger le profil utilisateur
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    
-    if (profileError) {
-      console.error('Error loading user profile:', profileError)
-      // Si le profil n'existe pas, on continue sans profil
+    try {
+      const { user } = await getUser()
+      setUser(user)
+      if (!user) {
+        router.replace('/auth/login')
+        return
+      }
+      
+      // Charger le profil utilisateur seulement si l'utilisateur existe
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      
+      if (profileError) {
+        console.error('Error loading user profile:', profileError)
+        // Si le profil n'existe pas, on continue sans profil
+        setUserProfile(null)
+      } else {
+        setUserProfile(profile)
+      }
+    } catch (error) {
+      console.error('Error checking user:', error)
+      // En cas d'erreur, rediriger vers login
+      router.replace('/auth/login')
       setUserProfile(null)
-    } else {
-      setUserProfile(profile)
     }
   }
 
@@ -50,7 +69,7 @@ function DashboardContent() {
       const { user } = await getUser()
       
       if (!user) {
-        router.push('/auth/login')
+        router.replace('/auth/login')
         return
       }
 
@@ -60,10 +79,26 @@ function DashboardContent() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        // Vérifier si c'est une erreur de configuration Supabase
+        if (error.message?.includes('CORS') || error.message?.includes('NetworkError') || error.message?.includes('fetch') || error.message?.includes('Failed to fetch')) {
+          console.error('❌ Erreur CORS - Supabase non configuré')
+          console.error('📝 Veuillez créer un fichier .env.local avec:')
+          console.error('   NEXT_PUBLIC_SUPABASE_URL=https://votre-projet.supabase.co')
+          console.error('   NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_cle_anon')
+          // Ne pas afficher d'alerte qui pourrait bloquer la navigation
+          // Juste initialiser avec un tableau vide
+          setProjects([])
+          setLoading(false)
+          return
+        }
+        throw error
+      }
       setProjects(data || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading projects:', error)
+      // En cas d'erreur, initialiser avec un tableau vide pour éviter les erreurs de rendu
+      setProjects([])
     } finally {
       setLoading(false)
     }

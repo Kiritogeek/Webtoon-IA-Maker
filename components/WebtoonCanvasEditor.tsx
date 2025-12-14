@@ -239,7 +239,7 @@ export default function WebtoonCanvasEditor({
 
       if (!response.ok) throw new Error('Failed to generate image')
 
-      const { imageUrl } = await response.json()
+      const { imageUrl, message, warnings } = await response.json()
 
       const updatedItems = canvasItems.map(i =>
         i.id === selectedId ? { ...i, imageUrl } : i
@@ -255,7 +255,11 @@ export default function WebtoonCanvasEditor({
 
       setShowAIBubble(null)
       setAiPrompt('')
-      alert('Pose/émotion/cadrage appliqués avec succès!')
+      
+      // Afficher le message explicatif de l'IA
+      const aiMessage = message || 'Pose/émotion/cadrage appliqués avec succès!'
+      const warningText = warnings && warnings.length > 0 ? `\n\n⚠️ ${warnings[0]}` : ''
+      alert(`${aiMessage}${warningText}`)
     } catch (error) {
       console.error('Error applying AI action:', error)
       alert('Erreur lors de l\'application de l\'IA')

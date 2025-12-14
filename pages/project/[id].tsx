@@ -45,7 +45,10 @@ function ProjectPageContent() {
         .single()
 
       if (error) throw error
-      setProject(data)
+      // Mettre à jour le store avec les nouvelles données
+      if (data) {
+        updateProject(data)
+      }
     } catch (error) {
       console.error('Error updating project:', error)
       alert('Erreur lors de la mise à jour du projet')
